@@ -5,7 +5,9 @@ import {
   DEFAULT_MODEL,
   DISALLOWED_TOOLS,
   extractJsonObject,
+  invocationFor,
   readResultText,
+  resolveClaudeExecutable,
 } from "../src/llm/client";
 
 const Schema = z.object({ answer: z.string(), score: z.number() });
@@ -78,6 +80,7 @@ describe("ClaudeCliClient", () => {
       "claude-sonnet-5",
       "--disallowedTools",
       DISALLOWED_TOOLS,
+      "--strict-mcp-config",
     ]);
   });
 
@@ -133,5 +136,82 @@ describe("ClaudeCliClient", () => {
       if (previous === undefined) delete process.env.SCOUT_MODEL;
       else process.env.SCOUT_MODEL = previous;
     }
+  });
+});
+
+describe("invocationFor", () => {
+  test("runs .exe and extensionless paths directly", () => {
+    expect(invocationFor("C:\\bin\\claude.exe")).toEqual({
+      cmd: "C:\\bin\\claude.exe",
+      prefixArgs: [],
+    });
+    expect(invocationFor("/usr/local/bin/claude")).toEqual({
+      cmd: "/usr/local/bin/claude",
+      prefixArgs: [],
+    });
+  });
+
+  test("wraps .cmd shims with an absolute cmd.exe and the absolute shim path", () => {
+    expect(invocationFor("C:\\npm\\claude.CMD", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
+      cmd: "C:\\Windows\\System32\\cmd.exe",
+      prefixArgs: ["/c", "C:\\npm\\claude.CMD"],
+    });
+    expect(invocationFor("C:\\npm\\claude.cmd", {})).toEqual({
+      cmd: "C:\\Windows\\System32\\cmd.exe",
+      prefixArgs: ["/c", "C:\\npm\\claude.cmd"],
+    });
+  });
+});
+
+describe("resolveClaudeExecutable", () => {
+  test("prefers the PATH-resolved executable", async () => {
+    const invocation = await resolveClaudeExecutable({
+      which: (name) => (name === "claude" ? "/usr/bin/claude" : null),
+    });
+    expect(invocation).toEqual({ cmd: "/usr/bin/claude", prefixArgs: [] });
+  });
+
+  test("falls back to known install locations by absolute path", async () => {
+    const invocation = await resolveClaudeExecutable({
+      which: () => null,
+      exists: async (path) => path === "C:\\Users\\kev\\.local\\bin\\claude.exe",
+      env: { USERPROFILE: "C:\\Users\\kev" },
+    });
+    expect(invocation).toEqual({
+      cmd: "C:\\Users\\kev\\.local\\bin\\claude.exe",
+      prefixArgs: [],
+    });
+  });
+
+  test("wraps an npm .cmd shim found by absolute path", async () => {
+    const invocation = await resolveClaudeExecutable({
+      which: () => null,
+      exists: async (path) => path.endsWith("claude.cmd"),
+      env: {
+        APPDATA: "C:\\Users\\kev\\AppData\\Roaming",
+        ComSpec: "C:\\Windows\\System32\\cmd.exe",
+      },
+    });
+    expect(invocation).toEqual({
+      cmd: "C:\\Windows\\System32\\cmd.exe",
+      prefixArgs: ["/c", "C:\\Users\\kev\\AppData\\Roaming\\npm\\claude.cmd"],
+    });
+  });
+
+  test("throws a clear error when nothing is found", async () => {
+    await expect(
+      resolveClaudeExecutable({ which: () => null, exists: async () => false, env: {} }),
+    ).rejects.toThrow("claude CLI not found");
+  });
+});
+
+describe("model id validation", () => {
+  test("rejects model ids with shell metacharacters", () => {
+    expect(() => new ClaudeCliClient({ modelId: "claude&calc.exe" })).toThrow("invalid model id");
+    expect(() => new ClaudeCliClient({ modelId: 'x" | evil' })).toThrow("invalid model id");
+  });
+
+  test("accepts normal model ids", () => {
+    expect(new ClaudeCliClient({ modelId: "claude-sonnet-5" }).modelId).toBe("claude-sonnet-5");
   });
 });

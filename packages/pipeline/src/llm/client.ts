@@ -69,20 +69,58 @@ export function extractJsonObject(text: string): string {
   return body.slice(start, end + 1);
 }
 
-export function resolveClaudeExecutable(): { cmd: string; prefixArgs: string[] } {
-  const direct = Bun.which("claude");
-  if (direct !== null) {
-    return { cmd: direct, prefixArgs: [] };
+const DEFAULT_COMSPEC = "C:\\Windows\\System32\\cmd.exe";
+const MODEL_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+export interface ExecutableInvocation {
+  cmd: string;
+  prefixArgs: string[];
+}
+
+export interface ResolveClaudeOptions {
+  which?: (name: string) => string | null;
+  exists?: (path: string) => Promise<boolean>;
+  env?: Record<string, string | undefined>;
+}
+
+export function invocationFor(
+  path: string,
+  env: Record<string, string | undefined> = process.env,
+): ExecutableInvocation {
+  // CreateProcess cannot run .cmd/.bat shims; an absolute cmd.exe + absolute shim path
+  // avoids cmd.exe's cwd-first lookup for both.
+  if (/\.(cmd|bat)$/i.test(path)) {
+    return { cmd: env.ComSpec ?? DEFAULT_COMSPEC, prefixArgs: ["/c", path] };
   }
-  if (process.platform === "win32") {
-    return { cmd: "cmd", prefixArgs: ["/c", "claude"] };
+  return { cmd: path, prefixArgs: [] };
+}
+
+export async function resolveClaudeExecutable(
+  options: ResolveClaudeOptions = {},
+): Promise<ExecutableInvocation> {
+  const which = options.which ?? ((name: string) => Bun.which(name));
+  const exists = options.exists ?? ((path: string) => Bun.file(path).exists());
+  const env = options.env ?? process.env;
+
+  const fromPath = which("claude") ?? which("claude.exe") ?? which("claude.cmd");
+  if (fromPath !== null) return invocationFor(fromPath, env);
+
+  const home = env.USERPROFILE ?? env.HOME ?? "";
+  const appData = env.APPDATA ?? "";
+  const candidates = [
+    home.length > 0 ? `${home}\\.local\\bin\\claude.exe` : null,
+    appData.length > 0 ? `${appData}\\npm\\claude.cmd` : null,
+  ].filter((path): path is string => path !== null);
+
+  for (const candidate of candidates) {
+    if (await exists(candidate)) return invocationFor(candidate, env);
   }
   throw new Error("claude CLI not found on PATH — install Claude Code and log in");
 }
 
 function createProcessRunner(timeoutMs: number): CliRunner {
   return async ({ args, prompt }) => {
-    const { cmd, prefixArgs } = resolveClaudeExecutable();
+    const { cmd, prefixArgs } = await resolveClaudeExecutable();
     const proc = Bun.spawn([cmd, ...prefixArgs, ...args], {
       stdin: new TextEncoder().encode(prompt),
       stdout: "pipe",
@@ -114,7 +152,9 @@ export class ClaudeCliClient implements LlmClient {
   private readonly run: CliRunner;
 
   constructor(options: ClaudeCliOptions = {}) {
-    this.modelId = options.modelId ?? process.env.SCOUT_MODEL ?? DEFAULT_MODEL;
+    const modelId = options.modelId ?? process.env.SCOUT_MODEL ?? DEFAULT_MODEL;
+    if (!MODEL_ID_PATTERN.test(modelId)) throw new Error(`invalid model id: ${modelId}`);
+    this.modelId = modelId;
     this.run = options.run ?? createProcessRunner(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   }
 
@@ -127,6 +167,7 @@ export class ClaudeCliClient implements LlmClient {
       this.modelId,
       "--disallowedTools",
       DISALLOWED_TOOLS,
+      "--strict-mcp-config",
     ];
     const base = `${prompt}\n\n${JSON_ONLY_INSTRUCTION}`;
     let attemptPrompt = base;
