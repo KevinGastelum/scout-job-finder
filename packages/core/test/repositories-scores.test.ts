@@ -138,6 +138,7 @@ describe("scores repository", () => {
       rubricVersion: RUBRIC_VERSION,
       result: RUBRIC,
       promptVersion: "scoring-prompt-v1",
+      profileVersion: "profile-a",
       modelId: "claude-sonnet-5",
       scoredAt: "2026-07-28T11:00:00.000Z",
     });
@@ -166,6 +167,7 @@ describe("scores repository", () => {
       rubricVersion: RUBRIC_VERSION,
       result: RUBRIC,
       promptVersion: "scoring-prompt-v1",
+      profileVersion: "profile-a",
       modelId: "claude-sonnet-5",
       scoredAt: "2026-07-28T11:00:00.000Z",
     });
@@ -194,7 +196,7 @@ describe("scores repository", () => {
     db.close();
   });
 
-  test("cache hit is keyed on description hash plus rubric version", async () => {
+  test("cache hit is keyed on description hash, rubric version, prompt version, profile version, and model", async () => {
     const { db, ids } = await seed([
       ["1", "shared-hash"],
       ["2", "shared-hash"],
@@ -210,21 +212,43 @@ describe("scores repository", () => {
         scoredAt: "2026-07-28T10:00:00.000Z",
       });
     }
-    expect(findCachedRubric(db, "shared-hash", RUBRIC_VERSION)).toBeNull();
+    expect(
+      findCachedRubric(db, "shared-hash", RUBRIC_VERSION, "scoring-prompt-v2", "profile-a", "claude-sonnet-5"),
+    ).toBeNull();
 
     saveRubricResult(db, {
       jobId: first,
       rubricVersion: RUBRIC_VERSION,
       result: RUBRIC,
-      promptVersion: "scoring-prompt-v1",
+      promptVersion: "scoring-prompt-v2",
+      profileVersion: "profile-a",
       modelId: "claude-sonnet-5",
       scoredAt: "2026-07-28T11:00:00.000Z",
     });
 
-    const cached = findCachedRubric(db, "shared-hash", RUBRIC_VERSION);
+    const cached = findCachedRubric(
+      db,
+      "shared-hash",
+      RUBRIC_VERSION,
+      "scoring-prompt-v2",
+      "profile-a",
+      "claude-sonnet-5",
+    );
     expect(cached?.result.overall).toBe(82);
     expect(cached?.modelId).toBe("claude-sonnet-5");
-    expect(findCachedRubric(db, "shared-hash", "rubric-v2")).toBeNull();
+
+    expect(
+      findCachedRubric(db, "shared-hash", RUBRIC_VERSION, "scoring-prompt-v2", "profile-b", "claude-sonnet-5"),
+    ).toBeNull();
+    expect(
+      findCachedRubric(db, "shared-hash", RUBRIC_VERSION, "scoring-prompt-v1", "profile-a", "claude-sonnet-5"),
+    ).toBeNull();
+    expect(
+      findCachedRubric(db, "shared-hash", RUBRIC_VERSION, "scoring-prompt-v2", "profile-a", "other-model"),
+    ).toBeNull();
+    expect(
+      findCachedRubric(db, "shared-hash", "rubric-v2", "scoring-prompt-v2", "profile-a", "claude-sonnet-5"),
+    ).toBeNull();
     db.close();
   });
 

@@ -92,6 +92,7 @@ async function seed(scored: Array<[string, number | null]>): Promise<{
         rubricVersion: RUBRIC_VERSION,
         result: rubric(overall),
         promptVersion: "scoring-prompt-v1",
+        profileVersion: "profile-test",
         modelId: "claude-sonnet-5",
         scoredAt: "2026-07-28T10:00:00.000Z",
       });

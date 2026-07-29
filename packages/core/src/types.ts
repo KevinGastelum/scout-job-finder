@@ -114,6 +114,7 @@ export interface ScoreRecord {
   uncertainty: Uncertainty | null;
   rationale: string | null;
   promptVersion: string | null;
+  profileVersion: string | null;
   modelId: string | null;
   scoredAt: string;
 }

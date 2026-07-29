@@ -81,6 +81,7 @@ async function seed(): Promise<{ db: Database; jobId: number }> {
     rubricVersion: RUBRIC_VERSION,
     result: rubric(91),
     promptVersion: "scoring-prompt-v1",
+    profileVersion: "profile-test",
     modelId: "claude-sonnet-5",
     scoredAt: "2026-07-28T10:00:00.000Z",
   });

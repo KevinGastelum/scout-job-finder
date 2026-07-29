@@ -20,6 +20,7 @@ interface ScoreRow {
   uncertainty: string | null;
   rationale: string | null;
   prompt_version: string | null;
+  profile_version: string | null;
   model_id: string | null;
   scored_at: string;
 }
@@ -38,6 +39,7 @@ function toScoreRecord(row: ScoreRow): ScoreRecord {
     uncertainty: row.uncertainty as Uncertainty | null,
     rationale: row.rationale,
     promptVersion: row.prompt_version,
+    profileVersion: row.profile_version,
     modelId: row.model_id,
     scoredAt: row.scored_at,
   };
@@ -94,6 +96,7 @@ export interface RubricInput {
   rubricVersion: string;
   result: RubricResult;
   promptVersion: string;
+  profileVersion: string;
   modelId: string;
   scoredAt: string;
 }
@@ -102,7 +105,7 @@ export function saveRubricResult(db: Database, input: RubricInput): void {
   db.run(
     `UPDATE scores SET
        rubric_score = ?, dimensions = ?, uncertainty = ?, rationale = ?,
-       prompt_version = ?, model_id = ?, scored_at = ?
+       prompt_version = ?, profile_version = ?, model_id = ?, scored_at = ?
      WHERE job_id = ? AND rubric_version = ?`,
     [
       input.result.overall,
@@ -110,6 +113,7 @@ export function saveRubricResult(db: Database, input: RubricInput): void {
       input.result.uncertainty,
       input.result.rationale,
       input.promptVersion,
+      input.profileVersion,
       input.modelId,
       input.scoredAt,
       input.jobId,
@@ -137,14 +141,18 @@ export function findCachedRubric(
   db: Database,
   descriptionHash: string,
   rubricVersion: string,
+  promptVersion: string,
+  profileVersion: string,
+  modelId: string,
 ): CachedRubric | null {
   const row = db
-    .query<ScoreRow, [string, string]>(
+    .query<ScoreRow, [string, string, string, string, string]>(
       `SELECT * FROM scores
-       WHERE description_hash = ? AND rubric_version = ? AND rubric_score IS NOT NULL
+       WHERE description_hash = ? AND rubric_version = ? AND prompt_version = ?
+         AND profile_version = ? AND model_id = ? AND rubric_score IS NOT NULL
        ORDER BY scored_at DESC LIMIT 1`,
     )
-    .get(descriptionHash, rubricVersion);
+    .get(descriptionHash, rubricVersion, promptVersion, profileVersion, modelId);
   if (row === null) return null;
   const record = toScoreRecord(row);
   if (record.rubricScore === null || record.dimensions === null) return null;

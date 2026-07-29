@@ -76,13 +76,21 @@ export async function runFunnel(options: FunnelOptions): Promise<FunnelSummary> 
     const job = getJobById(db, candidate.jobId);
     if (job === null) continue;
 
-    const cached = findCachedRubric(db, job.descriptionHash, RUBRIC_VERSION);
+    const cached = findCachedRubric(
+      db,
+      job.descriptionHash,
+      RUBRIC_VERSION,
+      RUBRIC_PROMPT_VERSION,
+      profile.version,
+      llm.modelId,
+    );
     if (cached !== null) {
       saveRubricResult(db, {
         jobId: job.id,
         rubricVersion: RUBRIC_VERSION,
         result: cached.result,
         promptVersion: cached.promptVersion,
+        profileVersion: profile.version,
         modelId: cached.modelId,
         scoredAt: now().toISOString(),
       });
@@ -97,6 +105,7 @@ export async function runFunnel(options: FunnelOptions): Promise<FunnelSummary> 
         rubricVersion: RUBRIC_VERSION,
         result,
         promptVersion: RUBRIC_PROMPT_VERSION,
+        profileVersion: profile.version,
         modelId: llm.modelId,
         scoredAt: now().toISOString(),
       });
