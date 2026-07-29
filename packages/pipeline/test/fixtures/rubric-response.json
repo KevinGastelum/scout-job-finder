@@ -1,0 +1,37 @@
+{
+  "overall": 84,
+  "dimensions": {
+    "skillOverlap": {
+      "score": 9,
+      "evidence": ["build agentic systems with Python and Claude", "design tool schemas and evals"],
+      "note": "Direct overlap with agent harness work."
+    },
+    "seniorityMatch": {
+      "score": 8,
+      "evidence": ["5+ years of engineering experience"],
+      "note": "Senior band matches the profile ceiling."
+    },
+    "agenticCentrality": {
+      "score": 10,
+      "evidence": ["agents are the core product"],
+      "note": "Agentic work is the whole role."
+    },
+    "locationFit": {
+      "score": 10,
+      "evidence": ["Remote - USA"],
+      "note": "Remote US is fully compatible."
+    },
+    "compSignal": {
+      "score": 7,
+      "evidence": ["$180,000 - $220,000"],
+      "note": "Stated range is competitive."
+    },
+    "companySignal": {
+      "score": 6,
+      "evidence": ["Series A, 40 people"],
+      "note": "Early stage, moderate signal."
+    }
+  },
+  "uncertainty": "low",
+  "rationale": "Agentic engineering is the core of the role and the posting names the exact stack in the profile."
+}
