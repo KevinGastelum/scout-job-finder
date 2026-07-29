@@ -32,6 +32,16 @@ function isApplicationStatus(value: unknown): value is ApplicationStatus {
   );
 }
 
+function originAllowed(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (origin === null) return true;
+  try {
+    return new URL(origin).host === new URL(request.url).host;
+  } catch {
+    return false;
+  }
+}
+
 export function createApp(deps: AppDeps): AppHandler {
   const now = deps.now ?? (() => new Date());
   let scanning = false;
@@ -39,6 +49,10 @@ export function createApp(deps: AppDeps): AppHandler {
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+
+    if (request.method !== "GET" && !originAllowed(request)) {
+      return json({ error: "cross-origin request rejected" }, 403);
+    }
 
     if (path === "/api/shortlist") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
@@ -64,7 +78,8 @@ export function createApp(deps: AppDeps): AppHandler {
         const { runId } = await deps.startScan();
         return json({ runId }, 202);
       } catch (error) {
-        return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+        console.error("scan failed:", error);
+        return json({ error: "scan failed — check server logs" }, 500);
       } finally {
         scanning = false;
       }

@@ -209,14 +209,16 @@ describe("server app", () => {
     db.close();
   });
 
-  test("POST /api/run reports a failed scan as 500", async () => {
+  test("POST /api/run reports a failed scan without leaking internals", async () => {
     const { db } = await seed();
     const response = await appFor(db, async () => {
-      throw new Error("claude CLI exited 1");
+      throw new Error("claude CLI exited 1: C:\\Users\\Ivonne\\secret\\path");
     })(new Request("http://localhost/api/run", { method: "POST" }));
 
     expect(response.status).toBe(500);
-    expect(((await response.json()) as { error: string }).error).toContain("claude CLI exited 1");
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("scan failed — check server logs");
+    expect(body.error).not.toContain("claude CLI");
     db.close();
   });
 
@@ -234,6 +236,48 @@ describe("server app", () => {
       new Request("http://localhost/api/shortlist", { method: "DELETE" }),
     );
     expect(response.status).toBe(405);
+    db.close();
+  });
+});
+
+describe("origin guard", () => {
+  test("rejects cross-origin mutations", async () => {
+    const { db, jobId } = await seed();
+    const app = appFor(db);
+
+    const run = await app(
+      new Request("http://localhost/api/run", {
+        method: "POST",
+        headers: { origin: "http://evil.example" },
+      }),
+    );
+    expect(run.status).toBe(403);
+
+    const status = await app(
+      new Request(`http://localhost/api/jobs/${jobId}/status`, {
+        method: "POST",
+        headers: { origin: "http://evil.example" },
+        body: JSON.stringify({ status: "shortlisted" }),
+      }),
+    );
+    expect(status.status).toBe(403);
+    db.close();
+  });
+
+  test("allows same-origin and origin-less mutations", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    const sameOrigin = await app(
+      new Request("http://localhost/api/run", {
+        method: "POST",
+        headers: { origin: "http://localhost" },
+      }),
+    );
+    expect(sameOrigin.status).toBe(202);
+
+    const noOrigin = await app(new Request("http://localhost/api/run", { method: "POST" }));
+    expect(noOrigin.status).toBe(202);
     db.close();
   });
 });
