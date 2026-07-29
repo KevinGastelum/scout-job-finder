@@ -2,8 +2,10 @@ import { defaultDbPath, getLatestRun, listActiveJobs, loadProfile, openDb } from
 import {
   ClaudeCliClient,
   GreenhouseAdapter,
+  HnAdapter,
   LeverAdapter,
   RemotiveAdapter,
+  createDbHnCache,
   createHttpClient,
   runScan,
 } from "@scout/pipeline";
@@ -15,7 +17,12 @@ const llm = new ClaudeCliClient();
 
 const summary = await runScan({
   db,
-  adapters: [new RemotiveAdapter(), new GreenhouseAdapter(), new LeverAdapter()],
+  adapters: [
+    new RemotiveAdapter(),
+    new GreenhouseAdapter(),
+    new LeverAdapter(),
+    new HnAdapter(createDbHnCache(db)),
+  ],
   http,
   llm,
   profile,
