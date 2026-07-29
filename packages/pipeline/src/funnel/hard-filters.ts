@@ -27,21 +27,67 @@ const WORK_AUTH_BLOCKERS: { label: string; pattern: RegExp }[] = [
 
 const GENERIC_REMOTE_TERMS = new Set(["remote", "anywhere", "worldwide", "only"]);
 
+// A remote job listing one of these region bands is open to US-based candidates,
+// even without the literal words "remote"/"US"/"united states" in the location text.
+// "latam"/"emea"/"apac"/"europe" are deliberately excluded — they don't include the US.
+const US_INCLUSIVE_REGIONS = new Set([
+  "americas",
+  "america",
+  "north america",
+  "northern america",
+  "worldwide",
+  "global",
+  "anywhere",
+  "international",
+]);
+
 function tokenize(text: string): string[] {
   return text.split(/[^a-z]+/).filter(Boolean);
+}
+
+function stripGeneric(words: string[]): string[] {
+  return words.filter((word) => !GENERIC_REMOTE_TERMS.has(word));
+}
+
+function matchesUsInclusiveRegion(words: string[]): boolean {
+  if (words.some((word) => US_INCLUSIVE_REGIONS.has(word))) return true;
+  return US_INCLUSIVE_REGIONS.has(words.join(" "));
+}
+
+function matchesAcceptedLocation(words: string[], profile: CapabilityProfile): boolean {
+  return words.some((word) => profile.acceptedLocations.some((accepted) => tokenize(accepted).includes(word)));
+}
+
+// A single region phrase from a comma/slash-separated list on a remote job.
+// The list is a UNION of places the job is open to, so one matching phrase is enough.
+function regionPhraseAccepted(phrase: string, profile: CapabilityProfile): boolean {
+  const words = tokenize(phrase);
+  if (matchesUsInclusiveRegion(words)) return true;
+  const restricted = stripGeneric(words);
+  if (restricted.length === 0) return false;
+  return matchesAcceptedLocation(restricted, profile);
 }
 
 function locationAccepted(job: Job, profile: CapabilityProfile): boolean {
   const location = (job.location ?? "").toLowerCase();
   if (location.length === 0) return job.remote;
 
-  const words = tokenize(location);
-  if (words.includes("remote")) {
-    const restrictedTo = words.filter((word) => !GENERIC_REMOTE_TERMS.has(word));
-    if (restrictedTo.length > 0) {
-      return restrictedTo.some((word) =>
-        profile.acceptedLocations.some((accepted) => tokenize(accepted).includes(word)),
-      );
+  if (job.remote) {
+    const allWords = tokenize(location);
+    if (stripGeneric(allWords).length === 0) return true;
+
+    const phrases = location
+      .split(/[,/]/)
+      .map((phrase) => phrase.trim())
+      .filter(Boolean);
+
+    if (phrases.length > 1) {
+      return phrases.some((phrase) => regionPhraseAccepted(phrase, profile));
+    }
+
+    if (allWords.includes("remote")) {
+      const restrictedTo = stripGeneric(allWords);
+      return matchesUsInclusiveRegion(restrictedTo) || matchesAcceptedLocation(restrictedTo, profile);
     }
   }
 

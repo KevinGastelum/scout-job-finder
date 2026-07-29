@@ -88,6 +88,29 @@ describe("applyHardFilters", () => {
     expect(result.reasons).toContain("location:remote - europe only");
   });
 
+  test("accepts a remote role listing a US-inclusive region among others", () => {
+    const result = applyHardFilters(job({ location: "Americas, Europe, Israel" }), PROFILE);
+    expect(result.pass).toBe(true);
+  });
+
+  test("accepts a remote role listing Northern America among a region band", () => {
+    const result = applyHardFilters(
+      job({ location: "Northern America, LATAM, Europe, APAC" }),
+      PROFILE,
+    );
+    expect(result.pass).toBe(true);
+  });
+
+  test("rejects a remote role restricted to non-US region bands", () => {
+    const result = applyHardFilters(job({ location: "Europe, APAC" }), PROFILE);
+    expect(result.pass).toBe(false);
+  });
+
+  test("rejects a remote role restricted to LATAM only", () => {
+    const result = applyHardFilters(job({ location: "LATAM only" }), PROFILE);
+    expect(result.pass).toBe(false);
+  });
+
   test("rejects an on-site role in an unaccepted city", () => {
     const result = applyHardFilters(job({ remote: false, location: "Berlin, Germany" }), PROFILE);
     expect(result.pass).toBe(false);
