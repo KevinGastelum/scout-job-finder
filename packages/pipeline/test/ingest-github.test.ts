@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HttpError, type HttpClient } from "../src/http";
-import { fetchGithubRepos } from "../src/ingest/github";
+import { fetchGithubRepos, MAX_REPOS } from "../src/ingest/github";
 
 function fakeHttp(routes: Record<string, unknown>): HttpClient & { calls: string[] } {
   const calls: string[] = [];
@@ -123,5 +123,49 @@ describe("fetchGithubRepos", () => {
       ),
     });
     await expect(fetchGithubRepos(limited, "kev", tempCacheDir())).rejects.toThrow("rate limit");
+  });
+
+  test("turns 429 listing responses into actionable errors", async () => {
+    const limited = fakeHttp({
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": new HttpError(
+        429,
+        "https://api.github.com/users/kev/repos?per_page=100&sort=pushed",
+        "API rate limit exceeded",
+      ),
+    });
+    await expect(fetchGithubRepos(limited, "kev", tempCacheDir())).rejects.toThrow("rate limit");
+  });
+
+  test("turns rate-limited per-repo language calls into actionable errors", async () => {
+    const limited = fakeHttp({
+      ...routesFor(LISTING),
+      "https://api.github.com/repos/kev/warren/languages": new HttpError(
+        403,
+        "https://api.github.com/repos/kev/warren/languages",
+        "API rate limit exceeded",
+      ),
+    });
+    await expect(fetchGithubRepos(limited, "kev", tempCacheDir())).rejects.toThrow("rate limit");
+  });
+
+  test("caps fetched repos at MAX_REPOS", async () => {
+    const listing = Array.from({ length: 25 }, (_, index) => ({
+      name: `repo-${index}`,
+      description: null,
+      html_url: `https://github.com/kev/repo-${index}`,
+      language: null,
+      topics: [],
+      stargazers_count: 0,
+      pushed_at: `2026-07-${String((index % 28) + 1).padStart(2, "0")}T00:00:00Z`,
+      fork: false,
+    }));
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": listing,
+    };
+    for (const item of listing) {
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = {};
+    }
+    const repos = await fetchGithubRepos(fakeHttp(routes), "kev", tempCacheDir());
+    expect(repos.length).toBe(MAX_REPOS);
   });
 });

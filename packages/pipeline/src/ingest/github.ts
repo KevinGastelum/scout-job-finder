@@ -42,9 +42,10 @@ function rateLimited(error: unknown): boolean {
   return error instanceof HttpError && (error.status === 403 || error.status === 429);
 }
 
-function rateLimitError(): Error {
+function rateLimitError(cause: unknown): Error {
   return new Error(
     "GitHub rate limit hit (unauthenticated is 60 requests/hour, shared per IP). Wait for the reset or set GITHUB_TOKEN and re-run.",
+    { cause },
   );
 }
 
@@ -52,7 +53,13 @@ async function readCachedFetch(path: string): Promise<CachedFetch | null> {
   const file = Bun.file(path);
   if (!(await file.exists())) return null;
   try {
-    return (await file.json()) as CachedFetch;
+    const parsed = (await file.json()) as Partial<CachedFetch>;
+    if (typeof parsed.pushedAt !== "string" || !Array.isArray(parsed.languages)) return null;
+    return {
+      pushedAt: parsed.pushedAt,
+      languages: parsed.languages,
+      readme: typeof parsed.readme === "string" ? parsed.readme : null,
+    };
   } catch {
     return null;
   }
@@ -69,7 +76,7 @@ export async function fetchGithubRepos(
       `${GITHUB_API}/users/${user}/repos?per_page=100&sort=pushed`,
     );
   } catch (error) {
-    if (rateLimited(error)) throw rateLimitError();
+    if (rateLimited(error)) throw rateLimitError(error);
     throw error;
   }
 
@@ -105,7 +112,7 @@ export async function fetchGithubRepos(
         fetched = { pushedAt: item.pushed_at, languages: Object.keys(languages), readme };
         await Bun.write(cachePath, `${JSON.stringify(fetched, null, 2)}\n`);
       } catch (error) {
-        if (rateLimited(error)) throw rateLimitError();
+        if (rateLimited(error)) throw rateLimitError(error);
         throw error;
       }
     }
