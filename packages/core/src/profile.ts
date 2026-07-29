@@ -4,6 +4,7 @@ import {
   SENIORITY_LEVELS,
   TITLE_FAMILIES,
   type CapabilityProfile,
+  type ProfileEvidence,
   type Seniority,
   type TitleFamily,
 } from "./types";
@@ -123,6 +124,57 @@ export function parseProfileMarkdown(markdown: string): CapabilityProfile {
       .map(normalizeCompany)
       .filter((name) => name.length > 0),
     summary,
+  };
+}
+
+export interface GeneratedProfile {
+  generatedAt: string;
+  skills: string[];
+  evidence: ProfileEvidence[];
+}
+
+export function parseGeneratedProfile(raw: unknown): GeneratedProfile {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error("generated profile: not a JSON object");
+  }
+  const candidate = raw as Partial<GeneratedProfile>;
+  if (typeof candidate.generatedAt !== "string") {
+    throw new Error("generated profile: missing generatedAt");
+  }
+  if (!Array.isArray(candidate.skills) || !candidate.skills.every((s) => typeof s === "string")) {
+    throw new Error("generated profile: skills must be a string array");
+  }
+  const validEvidence = (entry: unknown): entry is ProfileEvidence =>
+    typeof entry === "object" &&
+    entry !== null &&
+    typeof (entry as ProfileEvidence).skill === "string" &&
+    typeof (entry as ProfileEvidence).source === "string" &&
+    typeof (entry as ProfileEvidence).detail === "string";
+  if (!Array.isArray(candidate.evidence) || !candidate.evidence.every(validEvidence)) {
+    throw new Error("generated profile: evidence entries must have skill, source, detail");
+  }
+  return {
+    generatedAt: candidate.generatedAt,
+    skills: candidate.skills,
+    evidence: candidate.evidence,
+  };
+}
+
+export function mergeGeneratedProfile(
+  profile: CapabilityProfile,
+  generated: GeneratedProfile,
+): CapabilityProfile {
+  const merged = new Set(profile.skills);
+  for (const skill of generated.skills) {
+    const cleaned = skill.trim().toLowerCase();
+    if (cleaned.length > 0) merged.add(cleaned);
+  }
+  const skills = [...merged].sort();
+  return {
+    ...profile,
+    skills,
+    evidence: generated.evidence,
+    version: sha256(`${profile.version}|${skills.join(",")}`).slice(0, 12),
   };
 }
 

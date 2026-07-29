@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseProfileMarkdown } from "../src/profile";
+import { mergeGeneratedProfile, parseGeneratedProfile, parseProfileMarkdown } from "../src/profile";
 
 const MARKDOWN = `# Capability Profile
 
@@ -89,5 +89,56 @@ describe("parseProfileMarkdown", () => {
     expect(() => parseProfileMarkdown("# Capability Profile\n\n## Skills\n- python\n")).toThrow(
       /missing required section: Identity/,
     );
+  });
+});
+
+const GENERATED = {
+  generatedAt: "2026-07-29T12:00:00.000Z",
+  skills: ["  WebSockets ", "typescript", "vite", ""],
+  evidence: [
+    { skill: "agents", source: "github.com/kevingastelum/warren", detail: "Sandboxed agent control plane." },
+  ],
+};
+
+describe("parseGeneratedProfile", () => {
+  test("accepts a valid generated inventory", () => {
+    const parsed = parseGeneratedProfile(GENERATED);
+    expect(parsed.skills.length).toBe(4);
+    expect(parsed.evidence[0]?.skill).toBe("agents");
+  });
+
+  test("rejects non-objects and malformed evidence", () => {
+    expect(() => parseGeneratedProfile("nope")).toThrow("not a JSON object");
+    expect(() =>
+      parseGeneratedProfile({ generatedAt: "x", skills: ["a"], evidence: [{ skill: 1 }] }),
+    ).toThrow("evidence");
+  });
+});
+
+describe("mergeGeneratedProfile", () => {
+  const base = parseProfileMarkdown(MARKDOWN);
+
+  test("unions generated skills lowercase, trimmed, deduped, sorted", () => {
+    const merged = mergeGeneratedProfile(base, parseGeneratedProfile(GENERATED));
+    expect(merged.skills).toContain("websockets");
+    expect(merged.skills).toContain("vite");
+    expect(merged.skills).toEqual([...merged.skills].sort());
+    expect(merged.skills.filter((skill) => skill === "typescript").length).toBe(1);
+    expect(merged.skills).not.toContain("");
+  });
+
+  test("attaches evidence and leaves hand-curated fields alone", () => {
+    const merged = mergeGeneratedProfile(base, parseGeneratedProfile(GENERATED));
+    expect(merged.evidence?.length).toBe(1);
+    expect(merged.rareSkills).toEqual(base.rareSkills);
+    expect(merged.name).toBe(base.name);
+    expect(merged.targetTitleFamilies).toEqual(base.targetTitleFamilies);
+  });
+
+  test("recomputes the profile version deterministically", () => {
+    const generated = parseGeneratedProfile(GENERATED);
+    const merged = mergeGeneratedProfile(base, generated);
+    expect(merged.version).not.toBe(base.version);
+    expect(mergeGeneratedProfile(base, generated).version).toBe(merged.version);
   });
 });

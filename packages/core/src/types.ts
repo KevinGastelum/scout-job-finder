@@ -141,6 +141,12 @@ export interface RunRecord {
   error: string | null;
 }
 
+export interface ProfileEvidence {
+  skill: string;
+  source: string;
+  detail: string;
+}
+
 export interface CapabilityProfile {
   version: string;
   name: string;
@@ -157,4 +163,5 @@ export interface CapabilityProfile {
   rareSkills: string[];
   targetCompanies: string[];
   summary: string;
+  evidence?: ProfileEvidence[];
 }
