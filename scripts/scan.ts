@@ -1,5 +1,11 @@
 import { defaultDbPath, getLatestRun, listActiveJobs, loadProfile, openDb } from "@scout/core";
-import { ClaudeCliClient, RemotiveAdapter, createHttpClient, runScan } from "@scout/pipeline";
+import {
+  ClaudeCliClient,
+  GreenhouseAdapter,
+  RemotiveAdapter,
+  createHttpClient,
+  runScan,
+} from "@scout/pipeline";
 
 const db = await openDb(defaultDbPath());
 const profile = await loadProfile();
@@ -8,7 +14,7 @@ const llm = new ClaudeCliClient();
 
 const summary = await runScan({
   db,
-  adapters: [new RemotiveAdapter()],
+  adapters: [new RemotiveAdapter(), new GreenhouseAdapter()],
   http,
   llm,
   profile,
