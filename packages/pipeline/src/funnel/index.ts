@@ -72,7 +72,14 @@ export async function runFunnel(options: FunnelOptions): Promise<FunnelSummary> 
     updateRetrievalScore(db, candidate.jobId, RUBRIC_VERSION, candidate.score, candidate.paths);
   }
 
-  for (const candidate of listRubricCandidates(db, RUBRIC_VERSION, rubricBudget)) {
+  for (const candidate of listRubricCandidates(
+    db,
+    RUBRIC_VERSION,
+    rubricBudget,
+    RUBRIC_PROMPT_VERSION,
+    profile.version,
+    llm.modelId,
+  )) {
     const job = getJobById(db, candidate.jobId);
     if (job === null) continue;
 

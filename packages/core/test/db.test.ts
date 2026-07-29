@@ -75,3 +75,18 @@ describe("004_fingerprint_index migration", () => {
     db.close();
   });
 });
+
+describe("005_score_profile_version migration", () => {
+  test("adds the profile_version column used to key the rubric cache", async () => {
+    const db = new Database(":memory:");
+    const applied = await runMigrations(db);
+    expect(applied).toContain("005_score_profile_version.sql");
+
+    const columns = db
+      .query<{ name: string }, []>("PRAGMA table_info(scores)")
+      .all()
+      .map((row) => row.name);
+    expect(columns).toContain("profile_version");
+    db.close();
+  });
+});

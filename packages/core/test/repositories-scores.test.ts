@@ -252,6 +252,73 @@ describe("scores repository", () => {
     db.close();
   });
 
+  test("a legacy row with a null profile version is never a cache hit", async () => {
+    const { db, ids } = await seed([["1", "hash-1"]]);
+    const jobId = ids[0] ?? 0;
+    saveHardFilterResult(db, {
+      jobId,
+      descriptionHash: "hash-1",
+      rubricVersion: RUBRIC_VERSION,
+      pass: true,
+      reasons: [],
+      scoredAt: "2026-07-28T10:00:00.000Z",
+    });
+    saveRubricResult(db, {
+      jobId,
+      rubricVersion: RUBRIC_VERSION,
+      result: RUBRIC,
+      promptVersion: "scoring-prompt-v2",
+      profileVersion: "profile-a",
+      modelId: "claude-sonnet-5",
+      scoredAt: "2026-07-28T11:00:00.000Z",
+    });
+    db.run("UPDATE scores SET profile_version = NULL");
+
+    expect(
+      findCachedRubric(db, "hash-1", RUBRIC_VERSION, "scoring-prompt-v2", "profile-a", "claude-sonnet-5"),
+    ).toBeNull();
+    db.close();
+  });
+
+  test("re-queues a scored job whose prompt, profile, or model went stale", async () => {
+    const { db, ids } = await seed([["1", "hash-1"]]);
+    const jobId = ids[0] ?? 0;
+    saveHardFilterResult(db, {
+      jobId,
+      descriptionHash: "hash-1",
+      rubricVersion: RUBRIC_VERSION,
+      pass: true,
+      reasons: [],
+      scoredAt: "2026-07-28T10:00:00.000Z",
+    });
+    updateRetrievalScore(db, jobId, RUBRIC_VERSION, 50, ["title"]);
+    saveRubricResult(db, {
+      jobId,
+      rubricVersion: RUBRIC_VERSION,
+      result: RUBRIC,
+      promptVersion: "scoring-prompt-v2",
+      profileVersion: "profile-a",
+      modelId: "claude-sonnet-5",
+      scoredAt: "2026-07-28T11:00:00.000Z",
+    });
+
+    expect(
+      listRubricCandidates(
+        db,
+        RUBRIC_VERSION,
+        10,
+        "scoring-prompt-v2",
+        "profile-b",
+        "claude-sonnet-5",
+      ).map((entry) => entry.jobId),
+    ).toEqual([jobId]);
+
+    expect(
+      listRubricCandidates(db, RUBRIC_VERSION, 10, "scoring-prompt-v2", "profile-a", "claude-sonnet-5"),
+    ).toEqual([]);
+    db.close();
+  });
+
   test("lists unscored passing candidates in retrieval order", async () => {
     const { db, ids } = await seed([
       ["1", "hash-1"],
@@ -271,9 +338,18 @@ describe("scores repository", () => {
       updateRetrievalScore(db, jobId, RUBRIC_VERSION, scores[index] ?? 0, ["title"]);
     });
 
-    const candidates = listRubricCandidates(db, RUBRIC_VERSION, 10);
+    const candidates = listRubricCandidates(
+      db,
+      RUBRIC_VERSION,
+      10,
+      "scoring-prompt-v2",
+      "profile-a",
+      "claude-sonnet-5",
+    );
     expect(candidates.map((entry) => entry.jobId)).toEqual([ids[1], ids[0]]);
-    expect(listRubricCandidates(db, RUBRIC_VERSION, 1).length).toBe(1);
+    expect(
+      listRubricCandidates(db, RUBRIC_VERSION, 1, "scoring-prompt-v2", "profile-a", "claude-sonnet-5").length,
+    ).toBe(1);
     db.close();
   });
 });

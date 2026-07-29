@@ -178,23 +178,29 @@ export function listRubricCandidates(
   db: Database,
   rubricVersion: string,
   limit: number,
+  promptVersion: string,
+  profileVersion: string,
+  modelId: string,
 ): RubricCandidate[] {
   return db
     .query<
       { job_id: number; description_hash: string; retrieval_score: number },
-      [string, number]
+      [string, string, string, string, number]
     >(
       `SELECT scores.job_id, scores.description_hash, scores.retrieval_score
        FROM scores
        JOIN jobs ON jobs.id = scores.job_id
        WHERE scores.rubric_version = ?
          AND scores.hard_filter_pass = 1
-         AND scores.rubric_score IS NULL
+         AND (scores.rubric_score IS NULL
+              OR scores.prompt_version IS NOT ?
+              OR scores.profile_version IS NOT ?
+              OR scores.model_id IS NOT ?)
          AND jobs.status = 'active'
        ORDER BY scores.retrieval_score DESC, scores.job_id ASC
        LIMIT ?`,
     )
-    .all(rubricVersion, limit)
+    .all(rubricVersion, promptVersion, profileVersion, modelId, limit)
     .map((row) => ({
       jobId: row.job_id,
       descriptionHash: row.description_hash,
