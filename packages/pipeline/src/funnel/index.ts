@@ -53,14 +53,16 @@ export async function runFunnel(options: FunnelOptions): Promise<FunnelSummary> 
     const verdict = applyHardFilters(job, profile);
     summary.examined += 1;
     if (verdict.pass) summary.passedHardFilters += 1;
-    saveHardFilterResult(db, {
-      jobId: job.id,
-      descriptionHash: job.descriptionHash,
-      rubricVersion: RUBRIC_VERSION,
-      pass: verdict.pass,
-      reasons: verdict.reasons,
-      scoredAt: now().toISOString(),
-    });
+    db.transaction(() => {
+      saveHardFilterResult(db, {
+        jobId: job.id,
+        descriptionHash: job.descriptionHash,
+        rubricVersion: RUBRIC_VERSION,
+        pass: verdict.pass,
+        reasons: verdict.reasons,
+        scoredAt: now().toISOString(),
+      });
+    })();
   }
 
   const candidates = retrieveCandidates(db, profile, { limit: options.retrievalLimit });

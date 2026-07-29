@@ -62,18 +62,20 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
       for (const item of result.items) {
         try {
           const seenAt = now().toISOString();
-          const rawPostingId = insertRawPosting(db, {
-            runId,
-            source: adapter.id,
-            sourceNativeId: item.sourceNativeId,
-            payload: item.payload,
-            fetchedAt: seenAt,
-          });
-          const normalized = normalizeItem(item, adapter.id);
-          const identity = resolveIdentity(db, normalized);
-          const upserted = upsertJob(db, normalized, rawPostingId, identity.canonicalId, seenAt);
-          if (upserted.created) entry.created += 1;
-          else entry.updated += 1;
+          db.transaction(() => {
+            const rawPostingId = insertRawPosting(db, {
+              runId,
+              source: adapter.id,
+              sourceNativeId: item.sourceNativeId,
+              payload: item.payload,
+              fetchedAt: seenAt,
+            });
+            const normalized = normalizeItem(item, adapter.id);
+            const identity = resolveIdentity(db, normalized);
+            const upserted = upsertJob(db, normalized, rawPostingId, identity.canonicalId, seenAt);
+            if (upserted.created) entry.created += 1;
+            else entry.updated += 1;
+          })();
         } catch (error) {
           entry.errors.push(
             `${adapter.id} item ${item.sourceNativeId} failed: ${describeError(error)}`,

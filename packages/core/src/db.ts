@@ -1,6 +1,11 @@
 import { Database } from "bun:sqlite";
 
-const MIGRATION_FILES = ["001_initial.sql", "002_fts.sql", "003_hn_extractions.sql"] as const;
+const MIGRATION_FILES = [
+  "001_initial.sql",
+  "002_fts.sql",
+  "003_hn_extractions.sql",
+  "004_fingerprint_index.sql",
+] as const;
 
 export async function runMigrations(db: Database): Promise<string[]> {
   db.run(
@@ -30,6 +35,7 @@ export async function runMigrations(db: Database): Promise<string[]> {
 export async function openDb(path: string): Promise<Database> {
   const db = new Database(path, { create: true });
   db.run("PRAGMA journal_mode = WAL");
+  db.run("PRAGMA synchronous = NORMAL");
   db.run("PRAGMA foreign_keys = ON");
   await runMigrations(db);
   return db;
