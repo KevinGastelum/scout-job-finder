@@ -5,6 +5,7 @@ export * from "./url";
 export * from "./db";
 export * from "./taxonomy";
 export * from "./lexicon";
+export * from "./seed-companies";
 export * from "./profile";
 export * from "./repositories/runs";
 export * from "./repositories/raw-postings";
