@@ -174,7 +174,7 @@ export function mergeGeneratedProfile(
     ...profile,
     skills,
     evidence: generated.evidence,
-    version: sha256(`${profile.version}|${skills.join(",")}`).slice(0, 12),
+    version: sha256(`${profile.version}|${JSON.stringify(skills)}`).slice(0, 12),
   };
 }
 

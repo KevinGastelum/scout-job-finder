@@ -113,6 +113,10 @@ describe("parseGeneratedProfile", () => {
       parseGeneratedProfile({ generatedAt: "x", skills: ["a"], evidence: [{ skill: 1 }] }),
     ).toThrow("evidence");
   });
+
+  test("rejects missing skills", () => {
+    expect(() => parseGeneratedProfile({ generatedAt: "x", evidence: [] })).toThrow("skills");
+  });
 });
 
 describe("mergeGeneratedProfile", () => {
@@ -140,5 +144,16 @@ describe("mergeGeneratedProfile", () => {
     const merged = mergeGeneratedProfile(base, generated);
     expect(merged.version).not.toBe(base.version);
     expect(mergeGeneratedProfile(base, generated).version).toBe(merged.version);
+  });
+
+  test("evidence-only changes do not change the version", () => {
+    const generated = parseGeneratedProfile(GENERATED);
+    const differentEvidence = {
+      ...generated,
+      evidence: [{ skill: "mcp", source: "elsewhere", detail: "Different detail." }],
+    };
+    expect(mergeGeneratedProfile(base, differentEvidence).version).toBe(
+      mergeGeneratedProfile(base, generated).version,
+    );
   });
 });

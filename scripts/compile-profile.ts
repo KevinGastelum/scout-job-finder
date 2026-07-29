@@ -13,11 +13,17 @@ if (!(await file.exists())) {
 let profile = parseProfileMarkdown(await file.text());
 const generatedFile = Bun.file(generatedPath);
 if (await generatedFile.exists()) {
-  const generated = parseGeneratedProfile(await generatedFile.json());
-  profile = mergeGeneratedProfile(profile, generated);
-  console.log(
-    `Merged ${generatedPath} (${generated.skills.length} generated skills, ${generated.evidence.length} evidence entries)`,
-  );
+  try {
+    const generated = parseGeneratedProfile(await generatedFile.json());
+    profile = mergeGeneratedProfile(profile, generated);
+    console.log(
+      `Merged ${generatedPath} (${generated.skills.length} generated skills, ${generated.evidence.length} evidence entries)`,
+    );
+  } catch (error) {
+    console.error(`${generatedPath}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Fix or delete ${generatedPath}, then re-run "bun run profile".`);
+    process.exit(1);
+  }
 }
 await Bun.write(target, `${JSON.stringify(profile, null, 2)}\n`);
 console.log(
