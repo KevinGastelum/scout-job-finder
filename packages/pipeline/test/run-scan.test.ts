@@ -63,6 +63,7 @@ describe("runScan", () => {
     expect(summary.stats[0]?.updated).toBe(0);
     expect(summary.stats[0]?.errors).toEqual(["one board token returned 404"]);
     expect(summary.stats[0]?.queries).toEqual(["https://example.test/query"]);
+    expect(summary.funnel).toBeNull();
 
     expect(listActiveJobs(db).length).toBe(1);
     const rawCount = db

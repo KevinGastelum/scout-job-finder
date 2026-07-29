@@ -22,6 +22,14 @@ for (const entry of summary.stats) {
   for (const error of entry.errors.slice(0, 5)) console.log(`    ! ${error}`);
 }
 console.log(`  active jobs in database: ${listActiveJobs(db).length}`);
-console.log(`  scored this run: ${summary.scored}`);
+if (summary.funnel === null) {
+  console.log("  funnel skipped (no profile)");
+} else {
+  const f = summary.funnel;
+  console.log(
+    `  funnel: examined ${f.examined}, passed filters ${f.passedHardFilters}, retrieved ${f.retrieved}, scored ${f.scored}, cache hits ${f.cacheHits}, errors ${f.errors.length}`,
+  );
+  for (const error of f.errors.slice(0, 5)) console.log(`    ! ${error}`);
+}
 if (getLatestRun(db)?.status !== "completed") process.exitCode = 1;
 db.close();

@@ -14,6 +14,7 @@ import type { HttpClient } from "./http";
 import type { LlmClient } from "./llm/client";
 import { normalizeItem } from "./normalize";
 import { resolveIdentity } from "./identity";
+import { runFunnel, type FunnelSummary } from "./funnel";
 
 export interface ScanOptions {
   db: Database;
@@ -22,12 +23,14 @@ export interface ScanOptions {
   llm: LlmClient;
   profile?: CapabilityProfile;
   now?: () => Date;
+  rubricBudget?: number;
 }
 
 export interface ScanSummary {
   runId: number;
   stats: SourceStats[];
   scored: number;
+  funnel: FunnelSummary | null;
 }
 
 export async function runScan(options: ScanOptions): Promise<ScanSummary> {
@@ -87,8 +90,21 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
     stats.push(entry);
   }
 
-  finishRun(db, runId, "completed", stats, now().toISOString(), null);
-  return { runId, stats, scored: 0 };
+  let funnel: FunnelSummary | null = null;
+  if (options.profile !== undefined) {
+    funnel = await runFunnel({
+      db,
+      profile: options.profile,
+      llm,
+      rubricBudget: options.rubricBudget,
+      now,
+    });
+  }
+
+  const funnelError =
+    funnel !== null && funnel.errors.length > 0 ? funnel.errors.join(" | ") : null;
+  finishRun(db, runId, "completed", stats, now().toISOString(), funnelError);
+  return { runId, stats, scored: funnel?.scored ?? 0, funnel };
 }
 
 export { RemotiveAdapter } from "./adapters/remotive";
@@ -103,3 +119,14 @@ export type {
   RawItem,
   SourceAdapter,
 } from "./adapters/types";
+export {
+  DEFAULT_RUBRIC_BUDGET,
+  RUBRIC_PROMPT_VERSION,
+  RUBRIC_VERSION,
+  applyHardFilters,
+  retrieveCandidates,
+  runFunnel,
+  scoreWithRubric,
+  type FunnelSummary,
+  type RetrievalCandidate,
+} from "./funnel";
