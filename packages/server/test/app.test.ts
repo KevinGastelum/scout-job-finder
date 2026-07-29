@@ -280,4 +280,32 @@ describe("origin guard", () => {
     expect(noOrigin.status).toBe(202);
     db.close();
   });
+
+  test("rejects a malformed origin", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    const response = await app(
+      new Request("http://localhost/api/run", {
+        method: "POST",
+        headers: { origin: "null" },
+      }),
+    );
+    expect(response.status).toBe(403);
+    db.close();
+  });
+
+  test("rejects a port mismatch", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    const response = await app(
+      new Request("http://localhost/api/run", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+      }),
+    );
+    expect(response.status).toBe(403);
+    db.close();
+  });
 });
