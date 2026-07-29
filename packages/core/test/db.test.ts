@@ -59,3 +59,19 @@ describe("openDb", () => {
     db.close();
   });
 });
+
+describe("004_fingerprint_index migration", () => {
+  test("creates the fingerprint lookup index used by identity resolution", async () => {
+    const db = new Database(":memory:");
+    const applied = await runMigrations(db);
+    expect(applied).toContain("004_fingerprint_index.sql");
+
+    const index = db
+      .query<{ name: string }, []>(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_jobs_fingerprint'",
+      )
+      .get();
+    expect(index?.name).toBe("idx_jobs_fingerprint");
+    db.close();
+  });
+});
