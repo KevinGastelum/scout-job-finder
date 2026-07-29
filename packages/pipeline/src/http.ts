@@ -21,6 +21,7 @@ export interface HttpClientOptions {
   timeoutMs?: number;
   userAgent?: string;
   fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
+  headers?: Record<string, string>;
 }
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -52,7 +53,11 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
       await throttle();
       try {
         const response = await doFetch(url, {
-          headers: { accept: "application/json, text/plain, */*", "user-agent": userAgent },
+          headers: {
+            accept: "application/json, text/plain, */*",
+            "user-agent": userAgent,
+            ...options.headers,
+          },
           signal: AbortSignal.timeout(timeoutMs),
         });
         if (response.ok) return response;
