@@ -27,7 +27,11 @@ capability profile (`profile/`), not in this spec.
 ## 3. Scope & constraints
 
 - Single user, local-first, Windows 11 + MSYS2 dev machine.
-- Bun + TypeScript strict + SQLite (`bun:sqlite`) + React. Claude API for LLM steps.
+- Bun + TypeScript strict + SQLite (`bun:sqlite`) + React.
+- **No LLM API keys / no per-token API cost.** All LLM steps run through headless
+  Claude Code (`claude -p`, subscription-billed) behind a swappable `LlmClient`
+  interface. Quota is shared with interactive sessions — batch and cache aggressively,
+  pace invocations.
 - Legitimate data sources only: documented/public APIs and feeds. No CAPTCHA bypass,
   no LinkedIn/Indeed botting, no scraping that violates ToS.
 - LLM discipline: deterministic code for fetching/normalization; LLM only for parsing
@@ -49,7 +53,9 @@ runs triggered by CLI or HTTP, cron later).
 - Later: `packages/mcp` (expose Scout tools over MCP), sanitized public demo deploy.
 
 Dependency policy: validate Bun compatibility before adopting any critical dependency;
-prefer Bun-native APIs. P1 dependency surface stays minimal (bun:sqlite, fetch, React/Vite).
+prefer Bun-native APIs. P1 dependency surface stays minimal (bun:sqlite, fetch,
+React/Vite, zod). LLM access = spawning the locally installed `claude` CLI (prompt via
+stdin to avoid Windows/MSYS2 quoting issues, `--output-format json`), not an SDK/API key.
 
 ## 5. Data model
 
@@ -172,9 +178,9 @@ duplicate/mass applications.
 
 ## 15. Privacy
 
-Resume, profile, application data, and DB stay local and gitignored. LLM calls go to
-the Claude API only; no third-party services receive PII beyond what a given
-application submission requires. Logs redact contact details. Demo deploy uses
+Resume, profile, application data, and DB stay local and gitignored. LLM calls run
+through Claude Code under Kevin's subscription; no third-party services receive PII
+beyond what a given application submission requires. Logs redact contact details. Demo deploy uses
 sanitized/synthetic data only.
 
 ## 16. Testing & error handling
@@ -203,7 +209,9 @@ sanitized/synthetic data only.
   the ladder degrades gracefully to fill-then-pause.
 - Source APIs change/rate-limit — per-source isolation + raw preservation limit blast
   radius.
-- LLM scoring drift/cost — funnel keeps LLM calls to shortlist only; caching + prompt
-  versioning; calibration set guards quality.
+- LLM quota (subscription-shared with interactive sessions) — funnel keeps LLM calls
+  to shortlist only; caching + prompt versioning; pace batches; calibration set guards
+  quality. `claude -p` latency is high per call — batch multiple postings per prompt
+  where output quality allows.
 - Bun-on-Windows edge cases — validate critical deps early; MSYS2 conventions per
   global CLAUDE.md (LF-only shell files, no heredoc JSON).
