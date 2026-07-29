@@ -67,4 +67,22 @@ describe("normalizeItem", () => {
     const job = normalizeItem(item({ title: "  Senior   AI   Engineer \n" }), "remotive");
     expect(job.title).toBe("Senior AI Engineer");
   });
+
+  test("never lets a javascript: url survive into job.url or job.canonicalUrl", () => {
+    const job = normalizeItem(item({ url: "javascript:alert(1)" }), "hn");
+    expect(job.url).not.toContain("javascript:");
+    expect(job.url).not.toBe("javascript:alert(1)");
+    expect(job.url.startsWith("https://")).toBe(true);
+    expect(job.canonicalUrl).not.toContain("javascript:");
+  });
+
+  test("falls back to the source's safe home page when the url has no http(s) scheme", () => {
+    const job = normalizeItem(item({ url: "data:text/html,evil" }), "greenhouse");
+    expect(job.url).toBe("https://www.greenhouse.io");
+  });
+
+  test("keeps a genuine http(s) url unchanged", () => {
+    const job = normalizeItem(item({ url: "https://acme.example/jobs/1" }), "remotive");
+    expect(job.url).toBe("https://acme.example/jobs/1");
+  });
 });

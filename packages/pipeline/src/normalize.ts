@@ -14,8 +14,25 @@ import type { RawItem } from "./adapters/types";
 const REMOTE_LOCATION = /\b(remote|anywhere|worldwide|distributed|work\s+from\s+home)\b/i;
 const REMOTE_DESCRIPTION = /\b(fully|100%|entirely)\s+remote\b|\bremote[\s-]first\b|\bwork\s+from\s+anywhere\b/i;
 
+const SAFE_URL_FALLBACK: Record<SourceId, string> = {
+  remotive: "https://remotive.com",
+  greenhouse: "https://www.greenhouse.io",
+  lever: "https://www.lever.co",
+  hn: "https://news.ycombinator.com",
+};
+
 function squash(value: string): string {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function safeUrl(rawUrl: string, source: SourceId): string {
+  try {
+    const protocol = new URL(rawUrl.trim()).protocol;
+    if (protocol === "http:" || protocol === "https:") return rawUrl.trim();
+  } catch {
+    // fall through to the safe fallback below
+  }
+  return SAFE_URL_FALLBACK[source];
 }
 
 export function normalizeItem(item: RawItem, source: SourceId): NormalizedJob {
@@ -28,6 +45,8 @@ export function normalizeItem(item: RawItem, source: SourceId): NormalizedJob {
     item.remote ||
     (location !== null && REMOTE_LOCATION.test(location)) ||
     REMOTE_DESCRIPTION.test(description);
+
+  const url = safeUrl(item.url, source);
 
   return {
     source,
@@ -44,8 +63,8 @@ export function normalizeItem(item: RawItem, source: SourceId): NormalizedJob {
     salaryText: item.salaryText,
     description,
     descriptionHash: sha256(description),
-    url: item.url,
-    canonicalUrl: canonicalizeUrl(item.url),
+    url,
+    canonicalUrl: canonicalizeUrl(url),
     postedAt: item.postedAt,
   };
 }
