@@ -154,11 +154,11 @@ describe("invocationFor", () => {
   test("wraps .cmd shims with an absolute cmd.exe and the absolute shim path", () => {
     expect(invocationFor("C:\\npm\\claude.CMD", { ComSpec: "C:\\Windows\\System32\\cmd.exe" })).toEqual({
       cmd: "C:\\Windows\\System32\\cmd.exe",
-      prefixArgs: ["/c", "C:\\npm\\claude.CMD"],
+      prefixArgs: ["/d", "/c", "C:\\npm\\claude.CMD"],
     });
     expect(invocationFor("C:\\npm\\claude.cmd", {})).toEqual({
       cmd: "C:\\Windows\\System32\\cmd.exe",
-      prefixArgs: ["/c", "C:\\npm\\claude.cmd"],
+      prefixArgs: ["/d", "/c", "C:\\npm\\claude.cmd"],
     });
   });
 });
@@ -194,7 +194,18 @@ describe("resolveClaudeExecutable", () => {
     });
     expect(invocation).toEqual({
       cmd: "C:\\Windows\\System32\\cmd.exe",
-      prefixArgs: ["/c", "C:\\Users\\kev\\AppData\\Roaming\\npm\\claude.cmd"],
+      prefixArgs: ["/d", "/c", "C:\\Users\\kev\\AppData\\Roaming\\npm\\claude.cmd"],
+    });
+  });
+
+  test("wraps a PATH-resolved .cmd shim", async () => {
+    const invocation = await resolveClaudeExecutable({
+      which: (name) => (name === "claude" ? "C:\\x\\claude.cmd" : null),
+      env: { ComSpec: "C:\\Windows\\System32\\cmd.exe" },
+    });
+    expect(invocation).toEqual({
+      cmd: "C:\\Windows\\System32\\cmd.exe",
+      prefixArgs: ["/d", "/c", "C:\\x\\claude.cmd"],
     });
   });
 

@@ -88,9 +88,10 @@ export function invocationFor(
   env: Record<string, string | undefined> = process.env,
 ): ExecutableInvocation {
   // CreateProcess cannot run .cmd/.bat shims; an absolute cmd.exe + absolute shim path
-  // avoids cmd.exe's cwd-first lookup for both.
+  // avoids cmd.exe's cwd-first lookup for both. /d skips the HKCU AutoRun hook, which on
+  // some machines writes to stdout and would corrupt the JSON envelope parse.
   if (/\.(cmd|bat)$/i.test(path)) {
-    return { cmd: env.ComSpec ?? DEFAULT_COMSPEC, prefixArgs: ["/c", path] };
+    return { cmd: env.ComSpec ?? DEFAULT_COMSPEC, prefixArgs: ["/d", "/c", path] };
   }
   return { cmd: path, prefixArgs: [] };
 }
