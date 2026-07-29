@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defaultDbPath, loadProfile, openDb } from "@scout/core";
 import {
   ClaudeCliClient,
@@ -11,10 +12,11 @@ import {
   runScan,
 } from "@scout/pipeline";
 import { createApp } from "./app";
+import { resolveStaticPath } from "./static-path";
 
 const db = await openDb(defaultDbPath());
 const port = Number(process.env.SCOUT_PORT ?? 8787);
-const distDir = new URL("../../web/dist/", import.meta.url);
+const distDir = fileURLToPath(new URL("../../web/dist/", import.meta.url));
 
 const handleApi = createApp({
   db,
@@ -42,13 +44,14 @@ Bun.serve({
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) return handleApi(request);
-    if (url.pathname.includes("..")) return new Response("forbidden", { status: 403 });
 
-    const relative = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
-    const asset = Bun.file(new URL(relative, distDir));
+    const resolved = resolveStaticPath(distDir, url.pathname);
+    if (resolved === null) return new Response("not found", { status: 404 });
+
+    const asset = Bun.file(resolved);
     if (await asset.exists()) return new Response(asset);
 
-    const index = Bun.file(new URL("index.html", distDir));
+    const index = Bun.file(resolveStaticPath(distDir, "/") ?? "");
     if (await index.exists()) return new Response(index);
     return new Response("dashboard not built — run `bun run web:build`", { status: 503 });
   },
