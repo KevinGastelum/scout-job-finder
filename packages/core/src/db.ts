@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 
-const MIGRATION_FILES = ["001_initial.sql", "002_fts.sql"] as const;
+const MIGRATION_FILES = ["001_initial.sql", "002_fts.sql", "003_hn_extractions.sql"] as const;
 
 export async function runMigrations(db: Database): Promise<string[]> {
   db.run(

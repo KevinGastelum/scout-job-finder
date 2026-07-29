@@ -11,3 +11,4 @@ export * from "./repositories/runs";
 export * from "./repositories/raw-postings";
 export * from "./repositories/jobs";
 export * from "./repositories/scores";
+export * from "./repositories/hn-extractions";
