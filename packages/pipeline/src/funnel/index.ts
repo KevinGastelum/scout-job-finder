@@ -38,7 +38,8 @@ export interface FunnelSummary {
 export async function runFunnel(options: FunnelOptions): Promise<FunnelSummary> {
   const { db, profile, llm } = options;
   const now = options.now ?? (() => new Date());
-  const rubricBudget = options.rubricBudget ?? DEFAULT_RUBRIC_BUDGET;
+  const requestedBudget = options.rubricBudget ?? DEFAULT_RUBRIC_BUDGET;
+  const rubricBudget = Number.isSafeInteger(requestedBudget) && requestedBudget > 0 ? requestedBudget : 0;
 
   const summary: FunnelSummary = {
     examined: 0,

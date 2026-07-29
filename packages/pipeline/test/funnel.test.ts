@@ -208,6 +208,24 @@ describe("runFunnel", () => {
     db.close();
   });
 
+  test("normalizes a negative rubric budget to zero and makes no llm calls", async () => {
+    const { db } = await seedDb(SEEDS);
+    const llm = new MockLlmClient([]);
+    const summary = await runFunnel({
+      db,
+      profile: PROFILE,
+      llm,
+      rubricBudget: -1,
+      now: () => new Date("2026-07-28T12:00:00.000Z"),
+    });
+
+    expect(llm.requests.length).toBe(0);
+    expect(summary.scored).toBe(0);
+    expect(summary.cacheHits).toBe(0);
+    expect(summary.errors.length).toBe(0);
+    db.close();
+  });
+
   test("collects a scoring failure instead of aborting the funnel", async () => {
     const { db } = await seedDb(SEEDS);
     const summary = await runFunnel({
