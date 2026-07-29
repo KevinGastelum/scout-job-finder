@@ -2,6 +2,7 @@ import { defaultDbPath, getLatestRun, listActiveJobs, loadProfile, openDb } from
 import {
   ClaudeCliClient,
   GreenhouseAdapter,
+  LeverAdapter,
   RemotiveAdapter,
   createHttpClient,
   runScan,
@@ -14,7 +15,7 @@ const llm = new ClaudeCliClient();
 
 const summary = await runScan({
   db,
-  adapters: [new RemotiveAdapter(), new GreenhouseAdapter()],
+  adapters: [new RemotiveAdapter(), new GreenhouseAdapter(), new LeverAdapter()],
   http,
   llm,
   profile,

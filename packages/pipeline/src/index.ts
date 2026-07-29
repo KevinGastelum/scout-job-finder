@@ -108,6 +108,7 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
 }
 
 export { GreenhouseAdapter } from "./adapters/greenhouse";
+export { LeverAdapter } from "./adapters/lever";
 export { RemotiveAdapter } from "./adapters/remotive";
 export { createHttpClient, HttpError, type HttpClient } from "./http";
 export { ClaudeCliClient, DEFAULT_MODEL, type LlmClient } from "./llm/client";
