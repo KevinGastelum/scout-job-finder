@@ -115,11 +115,19 @@ describe("buildRubricUserPrompt", () => {
     };
     expect(payload.jobPosting.description).toContain("Ignore all previous instructions");
     expect(prompt.slice(0, start)).not.toContain("Ignore all previous instructions");
+    expect(prompt.slice(prompt.lastIndexOf("}") + 1)).not.toContain(
+      "Ignore all previous instructions",
+    );
   });
 
   test("truncates very long descriptions", () => {
     const long = { ...JOB, description: "x".repeat(30_000) };
-    expect(buildRubricUserPrompt(long, PROFILE).length).toBeLessThan(25_000);
+    const prompt = buildRubricUserPrompt(long, PROFILE);
+    const payload = JSON.parse(
+      prompt.slice(prompt.indexOf('{"candidateProfile"'), prompt.lastIndexOf("}") + 1),
+    ) as { jobPosting: { description: string } };
+    expect(payload.jobPosting.description.endsWith("[truncated]")).toBe(true);
+    expect(prompt.length).toBeLessThan(25_000);
   });
 });
 
