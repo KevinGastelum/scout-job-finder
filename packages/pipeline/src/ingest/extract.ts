@@ -15,11 +15,28 @@ export interface ProfileDocument {
 export interface ProfileInventory {
   skills: string[];
   evidence: ProfileEvidence[];
+  omitted: string[];
 }
 
 interface CachedDocResult {
   skills: string[];
   evidence: Array<{ skill: string; detail: string }>;
+}
+
+function isCachedDocResult(value: unknown): value is CachedDocResult {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<CachedDocResult>;
+  if (!Array.isArray(candidate.skills) || !candidate.skills.every((skill) => typeof skill === "string")) {
+    return false;
+  }
+  if (!Array.isArray(candidate.evidence)) return false;
+  return candidate.evidence.every(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as { skill?: unknown }).skill === "string" &&
+      typeof (entry as { detail?: unknown }).detail === "string",
+  );
 }
 
 const DocumentReplySchema = z.object({
@@ -50,19 +67,18 @@ Rules:
 Return this exact shape:
 {"documents": [{"id": "", "skills": [""], "evidence": [{"skill": "", "detail": ""}]}]}
 
+Input:
 ${data}
 
 Inventory every document above and return the documents object.`;
 }
 
-async function readCache(path: string): Promise<Record<string, CachedDocResult>> {
+async function readCache(path: string): Promise<Record<string, unknown>> {
   const file = Bun.file(path);
   if (!(await file.exists())) return {};
   try {
     const parsed: unknown = await file.json();
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, CachedDocResult>)
-      : {};
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -76,8 +92,12 @@ export async function extractProfileInventory(
   const keyOf = (document: ProfileDocument): string =>
     sha256(`${document.text}|${PROFILE_EXTRACT_PROMPT_VERSION}|${llm.modelId}`);
   const cache = await readCache(cachePath);
+  const cachedFor = (document: ProfileDocument): CachedDocResult | undefined => {
+    const value = cache[keyOf(document)];
+    return isCachedDocResult(value) ? value : undefined;
+  };
 
-  const misses = documents.filter((document) => cache[keyOf(document)] === undefined);
+  const misses = documents.filter((document) => cachedFor(document) === undefined);
   for (let index = 0; index < misses.length; index += EXTRACT_BATCH_SIZE) {
     const batch = misses.slice(index, index + EXTRACT_BATCH_SIZE);
     const reply = await llm.generateStructured(buildExtractionPrompt(batch), DocumentReplySchema);
@@ -94,18 +114,37 @@ export async function extractProfileInventory(
     await Bun.write(cachePath, `${JSON.stringify(cache)}\n`);
   }
 
+  const validKeys = new Set(documents.map((document) => keyOf(document)));
+  let pruned = false;
+  for (const key of Object.keys(cache)) {
+    if (!validKeys.has(key)) {
+      delete cache[key];
+      pruned = true;
+    }
+  }
+  if (pruned) {
+    await Bun.write(cachePath, `${JSON.stringify(cache)}\n`);
+  }
+
   const skills = new Set<string>();
   const evidence: ProfileEvidence[] = [];
+  const omitted: string[] = [];
   for (const document of documents) {
-    const hit = cache[keyOf(document)];
-    if (hit === undefined) continue;
+    const hit = cachedFor(document);
+    if (hit === undefined) {
+      omitted.push(document.id);
+      continue;
+    }
     for (const skill of hit.skills) {
       const cleaned = skill.trim().toLowerCase();
       if (cleaned.length > 0) skills.add(cleaned);
     }
     for (const item of hit.evidence) {
-      evidence.push({ skill: item.skill.trim().toLowerCase(), source: document.title, detail: item.detail });
+      const cleanedSkill = item.skill.trim().toLowerCase();
+      if (cleanedSkill.length === 0) continue;
+      skills.add(cleanedSkill);
+      evidence.push({ skill: cleanedSkill, source: document.title, detail: item.detail });
     }
   }
-  return { skills: [...skills].sort(), evidence };
+  return { skills: [...skills].sort(), evidence, omitted };
 }
