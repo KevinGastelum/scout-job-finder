@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  decodeEntities,
   htmlToText,
   lookupHnExtractions,
   saveHnExtraction,
@@ -182,7 +181,7 @@ export class HnAdapter implements SourceAdapter {
     const comments: Array<{ commentId: string; text: string; createdAt: string | null }> =
       topLevel.map((child) => ({
         commentId: String(child.id ?? ""),
-        text: htmlToText(decodeEntities(child.text ?? "")),
+        text: htmlToText(child.text ?? ""),
         createdAt: toIsoOrNull(child.created_at),
       }));
 

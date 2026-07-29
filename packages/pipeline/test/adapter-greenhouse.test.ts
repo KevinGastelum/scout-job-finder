@@ -96,4 +96,26 @@ describe("GreenhouseAdapter", () => {
     expect(result.queries).toEqual([]);
     expect(result.errors[0]).toContain("no verified greenhouse boards");
   });
+
+  test("fully decodes a double-escaped '&amp;lt;code&amp;gt;' fixture to literal text, because Greenhouse's API wraps real markup in an extra layer of entity-escaping, so the pre-decode exposes real tags for stripping and htmlToText's own decode unwinds the escaped-literal text underneath", async () => {
+    const payload = {
+      jobs: [
+        {
+          id: 5501299,
+          title: "Docs Engineer",
+          updated_at: "2026-07-20T09:00:00-04:00",
+          absolute_url: "https://job-boards.greenhouse.io/acmeai/jobs/5501299",
+          location: { name: "Remote" },
+          content:
+            "&lt;p&gt;Ship it with &amp;lt;code&amp;gt; blocks, not &amp;lt;template&amp;gt; tags.&lt;/p&gt;",
+        },
+      ],
+    };
+    const result = await new GreenhouseAdapter([COMPANIES[0] as SeedCompany]).fetch(
+      context(http(() => payload)),
+    );
+    expect(result.items[0]?.description).toBe(
+      "Ship it with <code> blocks, not <template> tags.",
+    );
+  });
 });

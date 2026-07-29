@@ -233,4 +233,40 @@ describe("HnAdapter", () => {
   test("pins the prompt version the cache is keyed on", () => {
     expect(HN_PROMPT_VERSION).toBe("hn-extract-v1");
   });
+
+  test("preserves a literal '<template>' code sample instead of stripping it as a fake tag, because HN comments carry real markup unescaped so only htmlToText's own single decode pass should ever run", async () => {
+    const codeComment = {
+      id: 42020000,
+      type: "comment",
+      author: "poster",
+      created_at: "2026-07-01T16:00:00.000Z",
+      text: "Ship it with &lt;template&gt; markup, not JSX.",
+      children: [],
+    };
+    const client = http((url) =>
+      url.includes("/items/") ? { ...itemsFixture, children: [codeComment] } : searchFixture,
+    );
+    const llm = new MockLlmClient([batchReply([{ commentId: "42020000", postings: [ACME] }])]);
+    const result = await new HnAdapter(new MemoryCache()).fetch(context(client, llm));
+
+    expect(result.items[0]?.description).toContain("Ship it with <template> markup, not JSX.");
+  });
+
+  test("only unwraps one escaping layer of a double-escaped '&amp;lt;code&amp;gt;' fixture, since a genuinely double-escaped sequence never occurs in real HN payloads and single-decode is the correct default", async () => {
+    const codeComment = {
+      id: 42030000,
+      type: "comment",
+      author: "poster",
+      created_at: "2026-07-01T16:00:00.000Z",
+      text: "Use &amp;lt;code&amp;gt; blocks in the README.",
+      children: [],
+    };
+    const client = http((url) =>
+      url.includes("/items/") ? { ...itemsFixture, children: [codeComment] } : searchFixture,
+    );
+    const llm = new MockLlmClient([batchReply([{ commentId: "42030000", postings: [ACME] }])]);
+    const result = await new HnAdapter(new MemoryCache()).fetch(context(client, llm));
+
+    expect(result.items[0]?.description).toContain("Use &lt;code&gt; blocks in the README.");
+  });
 });
