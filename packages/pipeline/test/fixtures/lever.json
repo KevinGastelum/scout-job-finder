@@ -1,0 +1,38 @@
+[
+  {
+    "id": "6f2a1b3c-1111-4a5b-9c8d-0e1f2a3b4c5d",
+    "text": "Forward Deployed Engineer",
+    "hostedUrl": "https://jobs.lever.co/novaai/6f2a1b3c-1111-4a5b-9c8d-0e1f2a3b4c5d",
+    "applyUrl": "https://jobs.lever.co/novaai/6f2a1b3c-1111-4a5b-9c8d-0e1f2a3b4c5d/apply",
+    "createdAt": 1784808000000,
+    "workplaceType": "remote",
+    "categories": { "commitment": "Full-time", "location": "Remote (US)", "team": "Field Engineering" },
+    "description": "<p>Deploy <b>agents</b> into customer environments.</p>",
+    "lists": [
+      { "text": "What you will do", "content": "<ul><li>Build tool integrations</li></ul>" },
+      { "text": "Requirements", "content": "<ul><li>5+ years shipping software</li></ul>" }
+    ],
+    "additional": "<p>We are remote-first.</p>",
+    "salaryRange": { "min": 170000, "max": 210000, "currency": "USD", "interval": "per-year-salary" }
+  },
+  {
+    "id": "7a3b2c4d-2222-4b6c-8d9e-1f2a3b4c5d6e",
+    "text": "Account Executive",
+    "hostedUrl": "https://jobs.lever.co/novaai/7a3b2c4d-2222-4b6c-8d9e-1f2a3b4c5d6e",
+    "createdAt": 1784635200000,
+    "workplaceType": "onsite",
+    "categories": { "commitment": "Full-time", "location": "San Francisco, CA", "team": "Sales" },
+    "description": "<p>Close enterprise deals.</p>",
+    "lists": [],
+    "additional": ""
+  },
+  {
+    "id": "",
+    "text": "Broken Posting",
+    "hostedUrl": "https://jobs.lever.co/novaai/broken",
+    "createdAt": "not-a-number",
+    "categories": { "location": "" },
+    "description": "",
+    "lists": []
+  }
+]

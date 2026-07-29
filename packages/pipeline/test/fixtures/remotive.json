@@ -1,0 +1,45 @@
+{
+  "0-legal-notice": "Recorded from https://remotive.com/api/remote-jobs?category=software-dev&limit=3",
+  "job-count": 3,
+  "jobs": [
+    {
+      "id": 1912345,
+      "url": "https://remotive.com/remote-jobs/software-dev/ai-engineer-1912345?utm_source=feed",
+      "title": "Senior AI Engineer",
+      "company_name": "Acme AI",
+      "category": "Software Development",
+      "tags": ["python", "llm", "agents"],
+      "job_type": "full_time",
+      "publication_date": "2026-07-24T09:00:00",
+      "candidate_required_location": "USA",
+      "salary": "$180,000 - $220,000",
+      "description": "<p>Build <b>agentic</b> systems with Python and Claude.</p><ul><li>5+ years experience</li></ul>"
+    },
+    {
+      "id": 1912346,
+      "url": "https://remotive.com/remote-jobs/software-dev/data-analyst-1912346",
+      "title": "Data Analyst",
+      "company_name": "Globex, Inc.",
+      "category": "Software Development",
+      "tags": ["sql"],
+      "job_type": "full_time",
+      "publication_date": "2026-07-23T12:30:00",
+      "candidate_required_location": "Europe",
+      "salary": "",
+      "description": "<p>Dashboards in Power BI.</p>"
+    },
+    {
+      "id": 1912347,
+      "url": "https://remotive.com/remote-jobs/software-dev/broken-1912347",
+      "title": "",
+      "company_name": "",
+      "category": "Software Development",
+      "tags": [],
+      "job_type": "contract",
+      "publication_date": "not-a-date",
+      "candidate_required_location": "",
+      "salary": null,
+      "description": ""
+    }
+  ]
+}
