@@ -19,6 +19,13 @@ describe("decodeEntities", () => {
     expect(decodeEntities("&#x27;x&#x27;")).toBe("'x'");
     expect(decodeEntities("&nosuchentity;")).toBe("&nosuchentity;");
   });
+
+  test("replaces invalid numeric code points instead of throwing", () => {
+    expect(decodeEntities("&#x110000;")).toBe("�");
+    expect(decodeEntities("&#999999999;")).toBe("�");
+    expect(decodeEntities("&#0;")).toBe("�");
+    expect(decodeEntities("&#xD800;")).toBe("�");
+  });
 });
 
 describe("htmlToText", () => {
@@ -47,5 +54,9 @@ describe("canonicalizeUrl", () => {
 
   test("returns the trimmed input when the url does not parse", () => {
     expect(canonicalizeUrl("  not a url  ")).toBe("not a url");
+  });
+
+  test("leaves non-http(s) schemes unchanged", () => {
+    expect(canonicalizeUrl("mailto:a@b")).toBe("mailto:a@b");
   });
 });

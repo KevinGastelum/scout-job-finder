@@ -24,6 +24,18 @@ describe("classifyTitleFamily", () => {
     expect(classifyTitleFamily("Head of Cupcakes")).toBeNull();
   });
 
+  test("does not classify product/program/project management titles as engineering", () => {
+    expect(classifyTitleFamily("Product Manager, AI Agents")).toBeNull();
+    expect(classifyTitleFamily("LLM Product Manager")).toBeNull();
+    expect(classifyTitleFamily("Program Manager, ML Platform")).toBeNull();
+    expect(classifyTitleFamily("Product Owner, Agentic Platform")).toBeNull();
+    expect(classifyTitleFamily("AI Product Engineer")).toBe("ai-product-engineer");
+  });
+
+  test("still classifies management titles that also mention engineer/engineering", () => {
+    expect(classifyTitleFamily("AI Engineer / Product Manager")).toBe("ai-engineer");
+  });
+
   test("every family has retrieval query terms", () => {
     expect(Object.keys(TITLE_FAMILY_QUERY_TERMS)).toContain("agentic-engineer");
     expect(TITLE_FAMILY_QUERY_TERMS["agentic-engineer"].length).toBeGreaterThan(0);
@@ -45,6 +57,11 @@ describe("inferSeniority", () => {
     expect(inferSeniority("AI Engineer", "5+ years of experience required")).toBe("senior");
     expect(inferSeniority("AI Engineer", "3 years of experience")).toBe("mid");
     expect(inferSeniority("AI Engineer", "1 year of experience")).toBe("junior");
+  });
+
+  test("uses the range minimum for a years-of-experience range, not the max", () => {
+    expect(inferSeniority("AI Engineer", "3 to 5 years of experience")).toBe("mid");
+    expect(inferSeniority("AI Engineer", "3-5 years of experience")).toBe("mid");
   });
 
   test("returns null when there is no signal", () => {

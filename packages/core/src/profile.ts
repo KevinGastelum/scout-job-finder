@@ -119,7 +119,9 @@ export function parseProfileMarkdown(markdown: string): CapabilityProfile {
     seniorityMax: toSeniority(requireKey(targets, "seniority-max", "Targets"), "seniority-max"),
     skills: [...new Set(skills)].sort(),
     rareSkills: [...new Set(rareSkills)].sort(),
-    targetCompanies: csv(requireKey(targets, "companies", "Targets")).map(normalizeCompany),
+    targetCompanies: csv(requireKey(targets, "companies", "Targets"))
+      .map(normalizeCompany)
+      .filter((name) => name.length > 0),
     summary,
   };
 }

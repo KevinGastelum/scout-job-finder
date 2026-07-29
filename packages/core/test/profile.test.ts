@@ -76,6 +76,15 @@ describe("parseProfileMarkdown", () => {
     );
   });
 
+  test("drops empty entries left by company suffix normalization", () => {
+    const withBareSuffix = MARKDOWN.replace(
+      "companies: Anthropic, Scale AI",
+      "companies: Inc., Acme Inc.",
+    );
+    const profile = parseProfileMarkdown(withBareSuffix);
+    expect(profile.targetCompanies).toEqual(["acme"]);
+  });
+
   test("rejects a missing required section", () => {
     expect(() => parseProfileMarkdown("# Capability Profile\n\n## Skills\n- python\n")).toThrow(
       /missing required section: Identity/,

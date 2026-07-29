@@ -10,15 +10,22 @@ const NAMED_ENTITIES: Record<string, string> = {
   hellip: "...",
 };
 
+function codePointToChar(code: number): string {
+  if (code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) {
+    return "�";
+  }
+  return String.fromCodePoint(code);
+}
+
 export function decodeEntities(input: string): string {
   return input.replace(/&(#[xX][0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, name: string) => {
     if (name.startsWith("#x") || name.startsWith("#X")) {
       const code = Number.parseInt(name.slice(2), 16);
-      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+      return Number.isNaN(code) ? match : codePointToChar(code);
     }
     if (name.startsWith("#")) {
       const code = Number.parseInt(name.slice(1), 10);
-      return Number.isNaN(code) ? match : String.fromCodePoint(code);
+      return Number.isNaN(code) ? match : codePointToChar(code);
     }
     const mapped = NAMED_ENTITIES[name];
     return mapped === undefined ? match : mapped;

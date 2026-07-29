@@ -25,6 +25,9 @@ export function canonicalizeUrl(input: string): string {
   } catch {
     return trimmed;
   }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return trimmed;
+  }
   parsed.hash = "";
   parsed.hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
   parsed.protocol = parsed.protocol.toLowerCase();

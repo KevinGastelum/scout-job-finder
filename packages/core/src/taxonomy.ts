@@ -56,8 +56,12 @@ export const TITLE_FAMILY_QUERY_TERMS: Record<TitleFamily, string[]> = {
   "software-engineer": ["software engineer", "full stack engineer"],
 };
 
+const MANAGEMENT_TITLE_MARKERS = /\b(?:product|program|project)\s+manager\b|\bproduct\s+owner\b/;
+const ENGINEERING_OVERRIDE = /\bengineer(?:ing)?\b/;
+
 export function classifyTitleFamily(title: string): TitleFamily | null {
   const lowered = title.toLowerCase();
+  if (MANAGEMENT_TITLE_MARKERS.test(lowered) && !ENGINEERING_OVERRIDE.test(lowered)) return null;
   for (const rule of FAMILY_RULES) {
     for (const pattern of rule.patterns) {
       if (pattern.test(lowered)) return rule.family;
@@ -81,7 +85,9 @@ export function inferSeniority(title: string, description: string): Seniority | 
     if (pattern.test(loweredTitle)) return level;
   }
   const years: number[] = [];
-  const matches = description.toLowerCase().matchAll(/(\d{1,2})\s*\+?\s*(?:-\s*\d{1,2}\s*)?years?/g);
+  const matches = description
+    .toLowerCase()
+    .matchAll(/(\d{1,2})\s*\+?\s*(?:(?:-|to)\s*\d{1,2}\s*)?years?/g);
   for (const match of matches) {
     const value = Number.parseInt(match[1] ?? "", 10);
     if (!Number.isNaN(value) && value > 0 && value < 30) years.push(value);
