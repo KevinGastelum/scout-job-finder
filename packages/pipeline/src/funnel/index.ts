@@ -20,6 +20,19 @@ import { RUBRIC_PROMPT_VERSION, RUBRIC_VERSION, scoreWithRubric } from "./rubric
 // sudden jump in postings should cost a capped number of subprocesses, not an unbounded one.
 export const DEFAULT_RUBRIC_BUDGET = 250;
 
+// Zero is a real setting, not a disabled one: it runs the fetch and both deterministic stages
+// and stops before the only stage that needs the `claude` CLI. That is what lets a scan run
+// somewhere the operator's CLI session does not exist, such as a cluster CronJob.
+export function parseRubricBudget(raw: string | null): number {
+  if (raw === null) return DEFAULT_RUBRIC_BUDGET;
+  const parsed = Number(raw);
+  // Silently coercing a typo to zero would report a healthy scan that scored nothing.
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`SCOUT_RUBRIC_BUDGET must be a whole number of 0 or more, got ${raw}`);
+  }
+  return parsed;
+}
+
 // A rubric call spawns a `claude` subprocess that spends nearly all its time waiting on the
 // model, so running a few at once cuts wall clock roughly linearly. Kept small deliberately —
 // these share the operator's interactive quota, and a wide burst just gets rate-limited.

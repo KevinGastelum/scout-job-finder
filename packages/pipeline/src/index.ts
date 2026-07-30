@@ -166,6 +166,7 @@ export {
   RUBRIC_PROMPT_VERSION,
   RUBRIC_VERSION,
   applyHardFilters,
+  parseRubricBudget,
   retrieveCandidates,
   runFunnel,
   scoreWithRubric,

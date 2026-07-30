@@ -1,4 +1,11 @@
-import { defaultDbPath, getLatestRun, listActiveJobs, loadProfile, openDb } from "@scout/core";
+import {
+  defaultDbPath,
+  envValue,
+  getLatestRun,
+  listActiveJobs,
+  loadProfile,
+  openDb,
+} from "@scout/core";
 import {
   ClaudeCliClient,
   AdzunaAdapter,
@@ -19,6 +26,7 @@ import {
   WorkableAdapter,
   createDbHnCache,
   createHttpClient,
+  parseRubricBudget,
   runScan,
 } from "@scout/pipeline";
 
@@ -26,9 +34,11 @@ const db = await openDb(defaultDbPath());
 const profile = await loadProfile();
 const http = createHttpClient();
 const llm = new ClaudeCliClient();
+const rubricBudget = parseRubricBudget(envValue("SCOUT_RUBRIC_BUDGET"));
 
 const summary = await runScan({
   db,
+  rubricBudget,
   adapters: [
     new RemotiveAdapter(),
     new GreenhouseAdapter(),

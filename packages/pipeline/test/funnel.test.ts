@@ -14,7 +14,12 @@ import fixture from "./fixtures/rubric-response.json";
 import type { LlmClient } from "../src/llm/client";
 import { MockLlmClient } from "../src/llm/mock";
 import { RUBRIC_VERSION } from "../src/funnel/rubric";
-import { RUBRIC_CONCURRENCY, runFunnel } from "../src/funnel";
+import {
+  DEFAULT_RUBRIC_BUDGET,
+  RUBRIC_CONCURRENCY,
+  parseRubricBudget,
+  runFunnel,
+} from "../src/funnel";
 
 const PROFILE: CapabilityProfile = {
   version: "abc123abc123",
@@ -279,5 +284,28 @@ describe("runFunnel", () => {
     expect(llm.calls).toBe(seeds.length);
     expect(llm.peak).toBe(RUBRIC_CONCURRENCY);
     db.close();
+  });
+});
+
+describe("parseRubricBudget", () => {
+  test("falls back to the default when unset", () => {
+    expect(parseRubricBudget(null)).toBe(DEFAULT_RUBRIC_BUDGET);
+  });
+
+  test("accepts an explicit ceiling", () => {
+    expect(parseRubricBudget("40")).toBe(40);
+  });
+
+  // A cluster CronJob runs fetch and the deterministic filters but must never reach the
+  // `claude` CLI, which is authenticated only on the operator's own machine.
+  test("accepts zero, which fetches and filters without scoring", () => {
+    expect(parseRubricBudget("0")).toBe(0);
+  });
+
+  // Coercing a typo to zero would report a healthy scan that quietly scored nothing.
+  test("rejects a value that is not a whole non-negative number", () => {
+    expect(() => parseRubricBudget("ten")).toThrow(/SCOUT_RUBRIC_BUDGET/);
+    expect(() => parseRubricBudget("-1")).toThrow(/SCOUT_RUBRIC_BUDGET/);
+    expect(() => parseRubricBudget("2.5")).toThrow(/SCOUT_RUBRIC_BUDGET/);
   });
 });
