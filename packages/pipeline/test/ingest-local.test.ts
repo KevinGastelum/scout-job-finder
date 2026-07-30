@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MAX_LOCAL_DEPS,
+  classifyLocalRepo,
   defaultLocalRoots,
-  localReposToIngest,
   scanLocalRepos,
   type LocalRepo,
 } from "../src/ingest/local";
@@ -31,6 +31,16 @@ async function makeSubmoduleRepo(repoPath: string, configText: string): Promise<
   const gitdir = join(repoPath, "..", ".git-modules", "repo");
   await Bun.write(join(repoPath, ".git"), `gitdir: ${gitdir}\n`);
   await Bun.write(join(gitdir, "config"), configText);
+}
+
+// Real git worktrees write *relative* gitdir/commondir paths, not absolute
+// ones — pin that shape specifically, since the absolute-path fixtures above
+// never exercise the isAbsolute()-false branches.
+async function makeRelativeWorktreeRepo(root: string, configText: string): Promise<void> {
+  const mainGitDir = join(root, "main", ".git");
+  await Bun.write(join(mainGitDir, "config"), configText);
+  await Bun.write(join(mainGitDir, "worktrees", "wt", "commondir"), "../..\n");
+  await Bun.write(join(root, "repo-a", ".git"), "gitdir: ../main/.git/worktrees/wt\n");
 }
 
 describe("scanLocalRepos", () => {
@@ -190,6 +200,15 @@ describe("scanLocalRepos", () => {
     expect(repo?.remote).toBe("kev/warren");
   });
 
+  test("parses a GitHub remote from an ssh:// origin URL with an explicit port", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath, '[remote "origin"]\n\turl = ssh://git@github.com:2222/kev/warren.git\n');
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
   test("parses a GitHub remote from an HTTPS origin URL with userinfo", async () => {
     const root = tempRoot();
     const repoPath = join(root, "repo-a");
@@ -241,12 +260,30 @@ describe("scanLocalRepos", () => {
     expect(repo?.remote).toBeNull();
   });
 
+  test("the url key is matched case-insensitively, like real git config semantics", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath, '[remote "origin"]\n\tURL = git@github.com:kev/warren.git\n');
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
   test("resolves the remote for a worktree via .git file -> gitdir -> commondir -> config", async () => {
     const root = tempRoot();
     const repoPath = join(root, "repo-a");
     await makeWorktreeRepo(repoPath, '[remote "origin"]\n\turl = git@github.com:kev/warren.git\n');
 
     const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
+  test("resolves the remote for a worktree using the relative gitdir/commondir paths real git writes", async () => {
+    const root = tempRoot();
+    await makeRelativeWorktreeRepo(root, '[remote "origin"]\n\turl = git@github.com:kev/warren.git\n');
+
+    const repos = await scanLocalRepos([root]);
+    const repo = repos.find((entry) => entry.name === "repo-a");
     expect(repo?.remote).toBe("kev/warren");
   });
 
@@ -298,7 +335,7 @@ describe("defaultLocalRoots", () => {
   });
 });
 
-describe("localReposToIngest", () => {
+describe("classifyLocalRepo", () => {
   function repo(overrides: Partial<LocalRepo>): LocalRepo {
     return {
       name: "repo",
@@ -311,45 +348,44 @@ describe("localReposToIngest", () => {
     };
   }
 
-  test("drops repos matching a github name case-insensitively", () => {
-    const local = [repo({ name: "Warren", remote: "kev/warren" }), repo({ name: "scratchpad" })];
-    const kept = localReposToIngest(local, ["warren"], new Set(["kev"]));
-    expect(kept.map((entry) => entry.name)).toEqual(["scratchpad"]);
+  test("drops a repo matching a github name case-insensitively", () => {
+    const result = classifyLocalRepo(repo({ name: "Warren", remote: "kev/warren" }), new Set(["warren"]));
+    expect(result).toBe("duplicate");
   });
 
-  test("drops repos matching a github name via the remote's name part", () => {
-    const local = [repo({ name: "local-alias", remote: "kev/OTHER-TOOL" })];
-    const kept = localReposToIngest(local, ["other-tool"], new Set(["kev"]));
-    expect(kept).toEqual([]);
+  test("drops a repo matching a github name via the remote's name part", () => {
+    const result = classifyLocalRepo(
+      repo({ name: "local-alias", remote: "kev/OTHER-TOOL" }),
+      new Set(["other-tool"]),
+    );
+    expect(result).toBe("duplicate");
   });
 
-  test("keeps repos that match nothing", () => {
-    const local = [repo({ name: "totally-local", remote: null })];
-    const kept = localReposToIngest(local, ["warren", "other-tool"], new Set(["kev"]));
-    expect(kept.map((entry) => entry.name)).toEqual(["totally-local"]);
+  test("keeps a repo that matches nothing", () => {
+    const result = classifyLocalRepo(
+      repo({ name: "totally-local", remote: null }),
+      new Set(["warren", "other-tool"]),
+    );
+    expect(result).toBe("keep");
   });
 
-  test("drops a repo whose remote owner is not in the owners set", () => {
-    const local = [repo({ name: "someone-elses-fork", remote: "otherperson/tool" })];
-    const kept = localReposToIngest(local, [], new Set(["kev"]));
-    expect(kept).toEqual([]);
-  });
-
-  test("keeps a repo with a null remote even when it matches nothing", () => {
-    const local = [repo({ name: "scratch-notes", remote: null })];
-    const kept = localReposToIngest(local, [], new Set(["kev"]));
-    expect(kept.map((entry) => entry.name)).toEqual(["scratch-notes"]);
+  test("keeps a repo with no origin url at all, even when nothing matches", () => {
+    const result = classifyLocalRepo(repo({ name: "scratch-notes", remote: null }), new Set());
+    expect(result).toBe("keep");
   });
 
   test("keeps an owned repo not on the github list", () => {
-    const local = [repo({ name: "side-project", remote: "kev/side-project" })];
-    const kept = localReposToIngest(local, ["warren"], new Set(["kev"]));
-    expect(kept.map((entry) => entry.name)).toEqual(["side-project"]);
+    const result = classifyLocalRepo(
+      repo({ name: "side-project", remote: "kev/side-project" }),
+      new Set(["warren"]),
+    );
+    expect(result).toBe("keep");
   });
 
-  test("owner matching is case-insensitive", () => {
-    const local = [repo({ name: "side-project", remote: "KEV/side-project" })];
-    const kept = localReposToIngest(local, [], new Set(["kev"]));
-    expect(kept.map((entry) => entry.name)).toEqual(["side-project"]);
+  test("keeps a repo whose remote is owned by someone else — ownership is not enforced here", () => {
+    // Policy: surface everything so the operator can see the full evidence
+    // surface; only exact GitHub duplicates get dropped, never ownership.
+    const result = classifyLocalRepo(repo({ name: "someone-elses-fork", remote: "otherperson/tool" }), new Set());
+    expect(result).toBe("keep");
   });
 });

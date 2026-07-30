@@ -4,7 +4,6 @@ import { MAX_README_CHARS } from "./constants";
 export const GITHUB_API = "https://api.github.com";
 export const MAX_REPOS = 20;
 export const MAX_REPOS_AUTHENTICATED = 120;
-export { MAX_README_CHARS };
 
 const LISTING_PAGE_SIZE = 100;
 const MAX_LISTING_PAGES = 3;
@@ -95,6 +94,7 @@ async function fetchListing(
     );
     all.push(...pageItems);
     if (pageItems.length < LISTING_PAGE_SIZE) break;
+    if (all.length >= MAX_REPOS_AUTHENTICATED) break;
   }
   return all;
 }
@@ -127,7 +127,9 @@ export async function fetchGithubRepos(
     const owner = item.owner?.login ?? user;
     const cachePath = `${cacheDir}/${owner}--${item.name}.json`;
     let fetched = await readCachedFetch(cachePath);
-    if (fetched === null || fetched.pushedAt !== item.pushed_at) {
+    const cachedButEmpty =
+      fetched !== null && fetched.languages.length === 0 && fetched.readme === null;
+    if (fetched === null || cachedButEmpty || fetched.pushedAt !== item.pushed_at) {
       try {
         const languages = await http.getJson<Record<string, number>>(
           `${GITHUB_API}/repos/${owner}/${item.name}/languages`,
@@ -145,15 +147,17 @@ export async function fetchGithubRepos(
         } catch (error) {
           if (!(error instanceof HttpError && error.status === 404)) throw error;
         }
-        fetched = { pushedAt: item.pushed_at, languages: Object.keys(languages), readme };
+
+        const languageNames = Object.keys(languages);
+        if (languageNames.length === 0 && readme === null) continue;
+
+        fetched = { pushedAt: item.pushed_at, languages: languageNames, readme };
         await Bun.write(cachePath, `${JSON.stringify(fetched, null, 2)}\n`);
       } catch (error) {
         if (rateLimited(error)) throw rateLimitError(authenticated, error);
         throw error;
       }
     }
-
-    if (fetched.languages.length === 0 && fetched.readme === null) continue;
 
     repos.push({
       name: item.name,

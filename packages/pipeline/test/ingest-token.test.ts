@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createHttpClient } from "../src/http";
 import { resolveGithubToken } from "../src/ingest/token";
 
 describe("resolveGithubToken", () => {
@@ -36,28 +37,24 @@ describe("resolveGithubToken", () => {
     expect(token).toBeNull();
   });
 
-  test("the resolved token never appears in console output", async () => {
+  test("an auth header secret never leaks into a thrown HttpError's message or stack", async () => {
     const secret = "ghp_super_secret_do_not_log_1234567890";
-    const captured: unknown[] = [];
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-    console.log = (...args: unknown[]) => captured.push(args);
-    console.error = (...args: unknown[]) => captured.push(args);
-    console.warn = (...args: unknown[]) => captured.push(args);
+    const client = createHttpClient({
+      retries: 1,
+      headers: { authorization: `Bearer ${secret}` },
+      fetchImpl: async () => new Response("not found", { status: 404 }),
+    });
 
+    let caught: unknown;
     try {
-      const fromEnv = await resolveGithubToken({ GITHUB_TOKEN: secret }, async () => null);
-      const fromRunner = await resolveGithubToken({}, async () => secret);
-      expect(fromEnv).toBe(secret);
-      expect(fromRunner).toBe(secret);
-    } finally {
-      console.log = originalLog;
-      console.error = originalError;
-      console.warn = originalWarn;
+      await client.getJson("https://api.github.com/user/repos");
+    } catch (error) {
+      caught = error;
     }
 
-    const serialized = JSON.stringify(captured);
-    expect(serialized).not.toContain(secret);
+    expect(caught).toBeInstanceOf(Error);
+    const err = caught as Error;
+    expect(err.message).not.toContain(secret);
+    expect(err.stack ?? "").not.toContain(secret);
   });
 });

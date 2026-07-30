@@ -198,7 +198,47 @@ describe("fetchGithubRepos", () => {
     ).toBe(1);
   });
 
-  test("skips a repo with no languages and no readme, but still caches it", async () => {
+  test("retries a repo whose on-disk cache is a stale empty entry, even though pushed_at still matches", async () => {
+    // Regression: entries like this could only have been written by a
+    // pre-fix build (empty results are no longer cached going forward), but
+    // an operator's existing cache dir may already hold one. It must not be
+    // treated as a fresh, trustworthy cache hit.
+    const cacheDir = tempCacheDir();
+    const pushedAt = "2026-05-15T00:00:00Z";
+    await Bun.write(
+      join(cacheDir, "kev--revived-repo.json"),
+      JSON.stringify({ pushedAt, languages: [], readme: null }),
+    );
+    const listing = [
+      {
+        name: "revived-repo",
+        description: null,
+        html_url: "https://github.com/kev/revived-repo",
+        language: "TypeScript",
+        topics: [],
+        stargazers_count: 0,
+        pushed_at: pushedAt,
+        fork: false,
+      },
+    ];
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": listing,
+      "https://api.github.com/repos/kev/revived-repo/languages": { TypeScript: 42 },
+      "https://api.github.com/repos/kev/revived-repo/readme": {
+        content: Buffer.from("# Revived").toString("base64"),
+        encoding: "base64",
+      },
+    };
+    const http = fakeHttp(routes);
+    const repos = await fetchGithubRepos(http, "kev", cacheDir);
+
+    expect(http.calls).toContain("https://api.github.com/repos/kev/revived-repo/languages");
+    expect(repos.map((repo) => repo.name)).toEqual(["revived-repo"]);
+    expect(repos[0]?.languages).toEqual(["TypeScript"]);
+    expect(repos[0]?.readme).toContain("Revived");
+  });
+
+  test("skips a repo with no languages and no readme, and does not cache it so it is retried next run", async () => {
     const cacheDir = tempCacheDir();
     const emptyListing = [
       {
@@ -218,7 +258,7 @@ describe("fetchGithubRepos", () => {
     };
     const repos = await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
     expect(repos).toEqual([]);
-    expect(await Bun.file(join(cacheDir, "kev--empty-repo.json")).exists()).toBe(true);
+    expect(await Bun.file(join(cacheDir, "kev--empty-repo.json")).exists()).toBe(false);
   });
 });
 
@@ -282,23 +322,25 @@ describe("fetchGithubRepos authenticated", () => {
     expect(repos.length).toBe(110);
   });
 
-  test("stops after 3 pages even when every page is full, and caps at MAX_REPOS_AUTHENTICATED", async () => {
-    const pages = [1, 2, 3].map((page) =>
-      Array.from({ length: 100 }, (_, index) => authenticatedItem(`p${page}-${index}`, "2026-07-01T00:00:00Z")),
+  test("stops paginating once the running total reaches MAX_REPOS_AUTHENTICATED, without fetching a 3rd page", async () => {
+    const page1 = Array.from({ length: 100 }, (_, index) =>
+      authenticatedItem(`p1-${index}`, "2026-07-01T00:00:00Z"),
     );
-    const routes: Record<string, unknown> = {};
-    pages.forEach((page, index) => {
-      routes[`https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=${index + 1}`] =
-        page;
-    });
-    for (const item of pages.flat()) {
+    const page2 = Array.from({ length: 100 }, (_, index) =>
+      authenticatedItem(`p2-${index}`, "2026-07-01T00:00:00Z"),
+    );
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1": page1,
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=2": page2,
+    };
+    for (const item of [...page1, ...page2]) {
       routes[`https://api.github.com/repos/kev/${item.name}/languages`] = { JavaScript: 1 };
     }
     const http = fakeHttp(routes);
     const repos = await fetchGithubRepos(http, "kev", tempCacheDir(), { authenticated: true });
 
     const listingCalls = http.calls.filter((url) => url.startsWith("https://api.github.com/user/repos"));
-    expect(listingCalls.length).toBe(3);
+    expect(listingCalls.length).toBe(2);
     expect(repos.length).toBe(MAX_REPOS_AUTHENTICATED);
   });
 

@@ -154,7 +154,6 @@ export {
   MAX_LOCAL_DEPS,
   classifyLocalRepo,
   defaultLocalRoots,
-  localReposToIngest,
   scanLocalRepos,
   type LocalRepo,
   type LocalRepoDisposition,

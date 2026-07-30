@@ -127,7 +127,7 @@ function extractOriginUrl(config: string): string | null {
       inOrigin = /^\[remote\s+"origin"\]$/i.test(line);
       continue;
     }
-    if (inOrigin && /^url\s*=/.test(line)) {
+    if (inOrigin && /^url\s*=/i.test(line)) {
       const eq = line.indexOf("=");
       if (eq === -1) continue;
       return line.slice(eq + 1).trim();
@@ -142,7 +142,7 @@ function parseGithubOwnerName(url: string): string | null {
 
   let path: string | null = remainder;
   if (path === null) {
-    const schemeForm = /^(?:ssh|https?):\/\/(?:[^@/]+@)?github\.com[:/](.+)$/i.exec(url);
+    const schemeForm = /^(?:ssh|https?):\/\/(?:[^@/]+@)?github\.com(?::\d+)?[:/](.+)$/i.exec(url);
     if (schemeForm === null) return null;
     path = schemeForm[1];
   }
@@ -189,7 +189,8 @@ async function parseRemote(dirPath: string, gitKind: "dir" | "file"): Promise<st
     return null;
   }
   const url = extractOriginUrl(config);
-  return url === null ? null : parseGithubOwnerName(url);
+  if (url === null) return null;
+  return parseGithubOwnerName(url);
 }
 
 async function tryBuildRepo(dirPath: string): Promise<LocalRepo | null> {
@@ -233,28 +234,14 @@ export async function scanLocalRepos(roots: string[]): Promise<LocalRepo[]> {
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export type LocalRepoDisposition = "keep" | "duplicate" | "foreign";
+export type LocalRepoDisposition = "keep" | "duplicate";
 
 export function classifyLocalRepo(
   repo: LocalRepo,
   githubNames: Set<string>,
-  owners: Set<string>,
 ): LocalRepoDisposition {
   if (githubNames.has(repo.name.toLowerCase())) return "duplicate";
   const remoteName = repo.remote?.split("/")[1]?.toLowerCase();
   if (remoteName !== undefined && githubNames.has(remoteName)) return "duplicate";
-  if (repo.remote !== null) {
-    const owner = repo.remote.split("/")[0]?.toLowerCase();
-    if (owner !== undefined && !owners.has(owner)) return "foreign";
-  }
   return "keep";
-}
-
-export function localReposToIngest(
-  local: LocalRepo[],
-  githubNames: string[],
-  owners: Set<string>,
-): LocalRepo[] {
-  const known = new Set(githubNames.map((name) => name.toLowerCase()));
-  return local.filter((repo) => classifyLocalRepo(repo, known, owners) === "keep");
 }

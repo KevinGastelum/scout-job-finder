@@ -65,12 +65,23 @@ const owners = new Set(
   [user, ...repos.map((repo) => repo.owner)].map((name) => name.toLowerCase()),
 );
 const githubNames = new Set(repos.map((repo) => repo.name.toLowerCase()));
-const dispositions = localRepos.map((repo) => classifyLocalRepo(repo, githubNames, owners));
+const dispositions = localRepos.map((repo) => classifyLocalRepo(repo, githubNames));
 const localOnly = localRepos.filter((_, index) => dispositions[index] === "keep");
 const droppedDuplicate = dispositions.filter((d) => d === "duplicate").length;
-const droppedForeign = dispositions.filter((d) => d === "foreign").length;
+
+// Ownership is not enforced — everything not already on GitHub is kept as
+// evidence. Report the composition instead, so it's still visible at a glance.
+const ownedCount = localOnly.filter((repo) => {
+  const owner = repo.remote?.split("/")[0]?.toLowerCase();
+  return owner !== undefined && owners.has(owner);
+}).length;
+const noRemoteCount = localOnly.filter((repo) => repo.remote === null).length;
+const foreignOwnedCount = localOnly.length - ownedCount - noRemoteCount;
 console.log(
-  `Found ${localRepos.length} local checkouts: ${localOnly.length} kept, ${droppedDuplicate} already on GitHub, ${droppedForeign} owned by someone else`,
+  `Found ${localRepos.length} local checkouts: ${localOnly.length} kept, ${droppedDuplicate} already on GitHub`,
+);
+console.log(
+  `  of the kept repos: ${ownedCount} have a remote owned by ${user}, ${noRemoteCount} have no resolvable remote, ${foreignOwnedCount} have a remote owned by someone else`,
 );
 const localWithContent = localOnly.filter(
   (repo) => repo.readme !== null || repo.manifests.length > 0 || repo.deps.length > 0,
