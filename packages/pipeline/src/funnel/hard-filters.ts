@@ -41,8 +41,66 @@ const US_INCLUSIVE_REGIONS = new Set([
   "international",
 ]);
 
+const US_STATE_NAMES = [
+  "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware",
+  "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky",
+  "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota", "mississippi",
+  "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico",
+  "new york", "north carolina", "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania",
+  "rhode island", "south carolina", "south dakota", "tennessee", "texas", "utah", "vermont",
+  "virginia", "washington", "west virginia", "wisconsin", "wyoming", "district of columbia",
+  "puerto rico",
+];
+
+// Two-letter codes are matched only as the last word of a comma/pipe-delimited component, never
+// as a bare word anywhere: "or", "in", "la", "me", "hi", "ok" and "ma" are all state codes and all
+// ordinary English words. `de` is left out of the set entirely — Germany appears in this feed far
+// more often than Delaware, and Delaware still matches by its full name.
+const US_STATE_CODES = new Set([
+  "al", "ak", "az", "ar", "ca", "co", "ct", "fl", "ga", "hi", "ia", "id", "il", "in", "ks", "ky",
+  "la", "ma", "md", "me", "mi", "mn", "mo", "ms", "mt", "nc", "nd", "ne", "nh", "nj", "nm", "nv",
+  "ny", "oh", "ok", "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "va", "vt", "wa", "wi", "wv",
+  "wy", "dc", "pr",
+  // Non-standard but unambiguous city codes some boards use in place of a state.
+  "nyc", "sf", "sfo", "chi", "sea", "bos", "atl",
+]);
+
 function tokenize(text: string): string[] {
   return text.split(/[^a-z]+/).filter(Boolean);
+}
+
+// A location string can list several places: "London, UK; Ontario, CAN; San Francisco, CA" and
+// "New York City, NY | Seattle, WA" both occur live. Splitting on every separator the feeds use
+// means a code is checked against its own city rather than against the whole string.
+function locationComponents(location: string): string[] {
+  return location
+    .split(/[,/|;]|\s+[-–—]\s+/)
+    .map((part) => part.replace(/\./g, "").trim())
+    .filter(Boolean);
+}
+
+function phraseInWords(phrase: string, words: string[]): boolean {
+  const needle = tokenize(phrase);
+  if (needle.length === 0) return false;
+  for (let index = 0; index + needle.length <= words.length; index += 1) {
+    if (needle.every((word, offset) => words[index + offset] === word)) return true;
+  }
+  return false;
+}
+
+// Kevin is a US citizen open to relocating anywhere in the country, so any US location qualifies —
+// the accepted-locations list names his preferences, not his limits.
+function matchesUnitedStates(location: string): boolean {
+  const words = tokenize(location);
+  if (words.includes("us") || words.includes("usa")) return true;
+  if (phraseInWords("united states", words)) return true;
+  if (US_STATE_NAMES.some((state) => phraseInWords(state, words))) return true;
+
+  return locationComponents(location).some((component) => {
+    const componentWords = tokenize(component);
+    const last = componentWords[componentWords.length - 1];
+    return last !== undefined && US_STATE_CODES.has(last);
+  });
 }
 
 function stripGeneric(words: string[]): string[] {
@@ -72,6 +130,8 @@ function locationAccepted(job: Job, profile: CapabilityProfile): boolean {
   const location = (job.location ?? "").toLowerCase();
   if (location.length === 0) return job.remote;
 
+  if (matchesUnitedStates(location)) return true;
+
   if (job.remote) {
     const allWords = tokenize(location);
     if (stripGeneric(allWords).length === 0) return true;
@@ -91,7 +151,10 @@ function locationAccepted(job: Job, profile: CapabilityProfile): boolean {
     }
   }
 
-  return profile.acceptedLocations.some((accepted) => location.includes(accepted));
+  // Word-sequence, not substring: "us" is a substring of "australia", "austria", "belarus",
+  // "cyprus" and "russia", which between them were letting ~590 non-US postings through.
+  const words = tokenize(location);
+  return profile.acceptedLocations.some((accepted) => phraseInWords(accepted, words));
 }
 
 export function applyHardFilters(job: Job, profile: CapabilityProfile): HardFilterResult {

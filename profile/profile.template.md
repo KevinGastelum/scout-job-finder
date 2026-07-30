@@ -15,7 +15,7 @@ Copy this file to `profile/profile.md`, edit it, then run `bun run profile`.
 - accepted-locations: remote, worldwide, anywhere, united states, us, usa, phoenix, arizona, san francisco, bay area, new york, seattle, austin, los angeles, denver, chicago, boston
 
 ## Targets
-- title-families: agentic-engineer, ai-engineer, llm-engineer, forward-deployed-engineer, ai-product-engineer
+- title-families: agentic-engineer, ai-engineer, llm-engineer, forward-deployed-engineer, ai-product-engineer, data-engineer, data-analyst, ml-engineer
 - seniority-min: mid
 - seniority-max: staff
 - companies: Anthropic, OpenAI, Scale AI, Cohere, Hugging Face, Perplexity, Sierra, Harvey, Glean, Together AI, Modal, Baseten, Fireworks AI, ElevenLabs, Mistral, Writer, Vercel, Databricks, Notion, Ramp

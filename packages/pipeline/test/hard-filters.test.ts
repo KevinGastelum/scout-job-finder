@@ -123,6 +123,45 @@ describe("applyHardFilters", () => {
     );
   });
 
+  // Kevin is a US citizen open to relocating, so the accepted-locations list is a preference
+  // ranking, not a boundary. Before this, "San Jose, CA" was rejected while "San Francisco, CA"
+  // passed, purely because one city name happened to be a substring of the list and the other
+  // wasn't — 8,589 of 18,432 filter failures were location, most of them US.
+  test("accepts a US state the accepted-locations list never names", () => {
+    for (const location of ["San Jose, CA", "Washington, DC", "Dallas, Texas", "Nampa, ID"]) {
+      expect(applyHardFilters(job({ remote: false, location }), PROFILE).pass).toBe(true);
+    }
+  });
+
+  test("accepts a multi-location posting where only one office is US", () => {
+    const result = applyHardFilters(
+      job({ remote: false, location: "London, UK | Seattle, WA" }),
+      PROFILE,
+    );
+    expect(result.pass).toBe(true);
+  });
+
+  // "us" is a substring of australia, austria, belarus, cyprus and russia, and the matcher used
+  // raw String.includes — 587 active non-US postings were passing the location filter on those
+  // five words alone. Matching whole words instead is the fix.
+  test("rejects countries whose names merely contain the letters us", () => {
+    for (const location of ["Melbourne, Australia", "Vienna, Austria", "Nicosia, Cyprus"]) {
+      expect(applyHardFilters(job({ remote: false, location }), PROFILE).pass).toBe(false);
+      expect(applyHardFilters(job({ remote: true, location: location.split(", ")[1]! }), PROFILE).pass).toBe(
+        false,
+      );
+    }
+  });
+
+  // Canadian province codes and Swiss/German country codes sit in the same "City, XX" shape as a
+  // US state code. None of them collide with a real state code except DE, which is left out of
+  // the code set on purpose.
+  test("rejects non-US two-letter region codes in the state-code position", () => {
+    for (const location of ["Toronto, ON", "Zürich, CH", "Berlin, DE", "Mexico City, MX"]) {
+      expect(applyHardFilters(job({ remote: false, location }), PROFILE).pass).toBe(false);
+    }
+  });
+
   test("rejects on-site roles when the profile is remote-only", () => {
     const remoteOnly = { ...PROFILE, remoteOnly: true };
     const result = applyHardFilters(job({ remote: false, location: "San Francisco, CA" }), remoteOnly);
