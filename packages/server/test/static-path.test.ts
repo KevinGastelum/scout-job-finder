@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { resolveStaticPath } from "../src/static-path";
 
-const DIST_DIR = join("C:", "repo", "packages", "web", "dist");
+// resolve() rather than a literal: `join("C:", "repo")` is drive-absolute on Windows but a
+// plain relative path on POSIX, so the fixture disagreed with the resolve() under test and
+// these assertions only held on one platform. A leading separator is absolute on both.
+const DIST_DIR = resolve("/repo/packages/web/dist");
 
 describe("resolveStaticPath", () => {
   test("resolves a top-level file within distDir", () => {
