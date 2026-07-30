@@ -7,6 +7,7 @@
     "scan": "bun run scripts/scan.ts",
     "profile": "bun run scripts/compile-profile.ts",
     "ingest": "bun run scripts/ingest-profile.ts && bun run profile",
+    "intel": "bun run scripts/intel.ts",
     "verify-boards": "bun run scripts/verify-boards.ts",
     "serve": "bun run packages/server/src/index.ts",
     "web:dev": "vite --config packages/web/vite.config.ts",
