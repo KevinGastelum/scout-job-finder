@@ -4,6 +4,7 @@ import {
   ClaudeCliClient,
   DEFAULT_MODEL,
   DISALLOWED_TOOLS,
+  MAX_ATTEMPTS,
   extractJsonObject,
   invocationFor,
   readResultText,
@@ -121,22 +122,44 @@ describe("ClaudeCliClient", () => {
     expect(prompts[1]).not.toContain("not-a-number");
   });
 
-  test("gives up after exactly one retry", async () => {
+  test("gives up after the attempt budget is spent", async () => {
     let calls = 0;
     const client = new ClaudeCliClient({
+      retryDelayMs: 0,
       run: async () => {
         calls += 1;
         return { exitCode: 0, stdout: envelope("no json here"), stderr: "" };
       },
     });
 
-    await expect(client.generateStructured("p", Schema)).rejects.toThrow(/after one retry/);
+    await expect(client.generateStructured("p", Schema)).rejects.toThrow(
+      new RegExp(`after ${MAX_ATTEMPTS} attempts`),
+    );
+    expect(calls).toBe(MAX_ATTEMPTS);
+  });
+
+  // A scan's LLM calls run while the network is up and down; a dropped call exits non-zero rather
+  // than returning bad JSON. Failing that job outright loses it from the shortlist for the whole
+  // run, so a non-zero exit is retried like any other transient fault.
+  test("retries a non-zero exit and succeeds once the cli recovers", async () => {
+    let calls = 0;
+    const client = new ClaudeCliClient({
+      retryDelayMs: 0,
+      run: async () => {
+        calls += 1;
+        if (calls === 1) return { exitCode: 1, stdout: "", stderr: "fetch failed" };
+        return { exitCode: 0, stdout: envelope('{"answer":"yes","score":7}'), stderr: "" };
+      },
+    });
+
+    expect(await client.generateStructured("p", Schema)).toEqual({ answer: "yes", score: 7 });
     expect(calls).toBe(2);
   });
 
-  test("surfaces a non-zero exit without retrying", async () => {
+  test("reports the exit status when every attempt fails", async () => {
     let calls = 0;
     const client = new ClaudeCliClient({
+      retryDelayMs: 0,
       run: async () => {
         calls += 1;
         return { exitCode: 1, stdout: "", stderr: "not logged in" };
@@ -144,7 +167,7 @@ describe("ClaudeCliClient", () => {
     });
 
     await expect(client.generateStructured("p", Schema)).rejects.toThrow(/exited 1/);
-    expect(calls).toBe(1);
+    expect(calls).toBe(MAX_ATTEMPTS);
   });
 
   test("reads SCOUT_MODEL when no model is passed", () => {

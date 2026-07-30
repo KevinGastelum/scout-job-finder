@@ -4,6 +4,13 @@ import type { ZodType } from "zod";
 export const DEFAULT_MODEL = "claude-sonnet-5";
 export const DEFAULT_TIMEOUT_MS = 180_000;
 
+// A scan makes hundreds of these calls, so a per-call failure rate that looks negligible still
+// drops jobs from the shortlist. Three attempts covers both failure modes seen in practice: the
+// model opening with prose instead of JSON, and the CLI exiting non-zero because the network
+// dropped mid-call.
+export const MAX_ATTEMPTS = 3;
+export const RETRY_BASE_DELAY_MS = 1_000;
+
 export const DISALLOWED_TOOLS =
   "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit,TodoWrite";
 
@@ -31,6 +38,7 @@ export type CliRunner = (invocation: CliInvocation) => Promise<CliResult>;
 export interface ClaudeCliOptions {
   modelId?: string;
   timeoutMs?: number;
+  retryDelayMs?: number;
   run?: CliRunner;
 }
 
@@ -152,12 +160,14 @@ function createProcessRunner(timeoutMs: number): CliRunner {
 export class ClaudeCliClient implements LlmClient {
   readonly modelId: string;
   private readonly run: CliRunner;
+  private readonly retryDelayMs: number;
 
   constructor(options: ClaudeCliOptions = {}) {
     const modelId = options.modelId ?? envOr("SCOUT_MODEL", DEFAULT_MODEL);
     if (!MODEL_ID_PATTERN.test(modelId)) throw new Error(`invalid model id: ${modelId}`);
     this.modelId = modelId;
     this.run = options.run ?? createProcessRunner(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    this.retryDelayMs = options.retryDelayMs ?? RETRY_BASE_DELAY_MS;
   }
 
   async generateStructured<T>(prompt: string, schema: ZodType<T>): Promise<T> {
@@ -175,15 +185,19 @@ export class ClaudeCliClient implements LlmClient {
     let attemptPrompt = base;
     let lastMessage = "";
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const result = await this.run({ args, prompt: attemptPrompt });
-      if (result.exitCode !== 0) {
-        throw new Error(
-          `claude CLI exited ${result.exitCode}: ${result.stderr.trim().slice(0, 500)}`,
-        );
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      if (attempt > 0 && this.retryDelayMs > 0) {
+        await Bun.sleep(this.retryDelayMs * 2 ** (attempt - 1));
       }
-      const text = readResultText(result.stdout);
+
       try {
+        const result = await this.run({ args, prompt: attemptPrompt });
+        if (result.exitCode !== 0) {
+          throw new Error(
+            `claude CLI exited ${result.exitCode}: ${result.stderr.trim().slice(0, 500)}`,
+          );
+        }
+        const text = readResultText(result.stdout);
         return schema.parse(JSON.parse(extractJsonObject(text)));
       } catch (error) {
         lastMessage = error instanceof Error ? error.message : String(error);
@@ -195,6 +209,8 @@ export class ClaudeCliClient implements LlmClient {
       }
     }
 
-    throw new Error(`claude CLI returned unusable JSON after one retry: ${lastMessage}`);
+    throw new Error(
+      `claude CLI failed after ${MAX_ATTEMPTS} attempts: ${lastMessage}`,
+    );
   }
 }
