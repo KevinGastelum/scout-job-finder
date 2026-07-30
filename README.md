@@ -68,6 +68,7 @@ Other commands:
 
 ```bash
 bun run score           # re-run the funnel over the stored jobs; 0 network
+bun run export          # write the ranked shortlist to profile/shortlist.csv
 bun run intel           # rank skill demand across collected postings; 0 network, 0 LLM
 bun test
 bun run typecheck
@@ -76,6 +77,13 @@ bun run verify-boards   # probe the Greenhouse/Lever/Ashby seed tokens
 
 `score` exists because the rubric cache keys on the profile version: editing `profile/profile.md`
 invalidates every stored score, and re-scoring shouldn't require re-fetching fifteen sources.
+
+`export` takes an optional path and row cap: `bun run export out.csv 100`. It includes dismissed
+rows so the file is a full record rather than a view, and lands in gitignored `profile/` because a
+shortlist names the roles you are chasing. Alongside the score it carries `source` (which board
+the posting came from), `status` (the stored application state) and two derived columns — `stage`
+(`to-review` / `to-prepare` / `to-apply` / `waiting` / `action-needed` / `closed`) and
+`next_action`. Statuses are set from the dashboard; the CSV is a read-only snapshot of them.
 
 Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MODEL` (model for
 `claude -p`, default `claude-sonnet-5`), `SCOUT_PORT` (server port, default `8787`),

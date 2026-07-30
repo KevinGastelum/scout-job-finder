@@ -1,10 +1,6 @@
-import type { ApplicationStatus, Job, RunRecord, ScoreRecord } from "@scout/core";
+import type { ApplicationStatus, RunRecord, ShortlistEntry } from "@scout/core";
 
-export interface ShortlistEntry {
-  job: Job;
-  score: ScoreRecord;
-  applicationStatus: ApplicationStatus | null;
-}
+export type { ShortlistEntry };
 
 async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
