@@ -1,0 +1,56 @@
+# Scout Operator's Manual
+
+Practical runbook for the single human operator (Kevin).
+
+## First-time setup
+
+1. **Install Bun**: Install [Bun](https://bun.sh) if not already installed. Every `just` recipe here is a thin wrapper over a `bun run` script, so `just` is optional — if it isn't installed, run the `bun run ...` command shown in parentheses instead.
+2. **Install dependencies & copy profile template**: Run `just setup` (or `bun install`, then if `profile/profile.md` is missing, copy `profile/profile.template.md` to `profile/profile.md`).
+3. **Edit profile**: Edit `profile/profile.md` to define candidate capability profile and constraints.
+4. **Add resume (optional)**: Export resume text to `profile/resume.md`.
+5. **Ensure Claude CLI setup**: Verify that the `claude` CLI is installed and authenticated — `claude auth status`, and `claude auth login` if not. Scout spawns `claude -p` headless locally without API keys. (`claude login` is not a command; the CLI would read `login` as a prompt and burn a turn on it.)
+6. **GitHub authentication (optional but recommended)**: Set `GITHUB_TOKEN` or authenticate via `gh` CLI (`gh auth login`). Without it, ingestion sees only public repos and gets 60 API requests/hour shared per IP; with it, private repos are included and the cap is 5000/hour.
+7. **Ingest profile**: Run `bun run ingest` (or `just ingest`). This builds `profile/generated.json` from your GitHub repos (private ones too, when a token resolves), local git checkouts under `~/Documents/Coding` and `~/Projects`, and `profile/resume.md` if present — then recompiles `profile/profile.json`.
+8. **Initial job scan**: Run `bun run scan` (or `just scan`) to fetch postings from source APIs and score candidate jobs.
+9. **Serve dashboard**: Run `just serve` (builds web frontend and starts server), then open http://127.0.0.1:8787 in your browser.
+10. **Market intel**: Run `just intel` to see which skills the postings actually demand, and which ones your profile is missing.
+
+## Daily routine
+
+1. **Run daily scan**: Run `just daily` (runs `bun run scan`, then refreshes market intel).
+2. **Open dashboard**: Navigate to http://127.0.0.1:8787.
+3. **Review shortlist**: Review the ranked shortlist along with cited evidence for every match decision.
+4. **Triage candidates**: Update job statuses (`shortlisted`, `dismissed`, `applied`).
+5. **Apply**: Apply to top matching positions manually via direct job links.
+
+## As needed
+
+### Profile & Ingestion Updates
+- **Re-ingest after repo or resume changes**: After pushing new repos, cloning work locally, or editing `profile/resume.md`, re-run `bun run ingest` (`just ingest`). Ingest is cached per document, so only changed documents trigger re-extraction. Re-scoring of affected jobs happens gradually (up to 25 rubric calls per scan).
+- **Scan different local roots**: Set `SCOUT_LOCAL_REPO_ROOTS` to a comma-separated list of directories to override the default `~/Documents/Coding` + `~/Projects`. Repos are found one and two levels deep.
+- **Update manual profile**: After editing `profile/profile.md`, recompile by running `bun run profile` (`just profile`).
+- **Batch profile edits**: Every edit to `profile/profile.md` or to the generated skill set changes `profile.version`, which re-queues rubric scoring at 25 jobs per scan. Make all your edits, then ingest once.
+
+### Market intel
+- **Refresh the demand report**: Run `just intel` after a scan. It reads only the local database — zero LLM calls, zero network — and writes two files.
+- `profile/market-intel.md` is **regenerated** every run. Don't hand-edit it.
+- `profile/skill-roadmap.md` is **append-only**: new gaps get appended, and nothing already in the file is rewritten. Tick items off with `- [x]` and add your own notes freely; the next run preserves them.
+- **Ranking is by distinct companies, not postings.** One employer can post hundreds of roles, so posting counts measure that company's hiring volume, not market demand. A skill wanted by 8 companies beats one repeated across 40 postings from a single company.
+- **Promote useful terms**: the report lists frequent terms the skill lexicon doesn't know. Adding a real one to `packages/core/src/lexicon.ts` makes it rank in the main tables and improves search recall.
+
+### Troubleshooting
+- **`bun: command not found`**: Bun installs to `~/.bun/bin`, which some shells (and MSYS2) don't pick up. Add it to `PATH`: `export PATH="$HOME/.bun/bin:$PATH"`.
+- **GitHub rate limits**: If repo extraction hits rate limits, set `GITHUB_TOKEN` or authenticate with `gh` CLI; otherwise wait for the hourly rate-limit reset.
+- **Claude CLI missing or unauthenticated**: Ensure `claude` is on `PATH` and `claude auth status` reports a login. Without one, headless `claude -p` calls fail.
+- **`just intel` says the database is missing**: Run `bun run scan` first — intel only reads what a scan already collected. Set `SCOUT_DB` if your database lives somewhere other than `./scout.db`.
+- **Scan errors**: If a scan reports errors, inspect server logs or query run history in the database (`scout.db`).
+- **Quota awareness**: Headless LLM calls share quota with interactive Claude sessions. Avoid running `ingest` or `scan` in tight loops to preserve subscription limits. `intel`, `profile`, `test`, and `typecheck` cost nothing.
+
+## What runs where
+
+| Command | What it does | Network / LLM cost |
+| --- | --- | --- |
+| `just ingest` (`bun run ingest`) | Extracts GitHub repos (private too, with a token), local git checkouts, and `profile/resume.md` into `profile/generated.json`, then recompiles `profile/profile.json` | GitHub: 1 listing call + 2 per uncached repo (≤41 unauthenticated, ≤243 authenticated). Local repo scan is filesystem-only. Plus one `claude` call per changed document — unchanged documents are served from cache |
+| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, and HN, deduplicates, and scores candidates | Source job APIs + up to 25 `claude` LLM rubric calls |
+| `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
+| `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |
