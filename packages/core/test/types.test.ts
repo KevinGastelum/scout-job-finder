@@ -22,6 +22,8 @@ describe("domain constants", () => {
       "linkedin",
       "usajobs",
       "adzuna",
+      "workable",
+      "teamtailor",
     ]);
   });
 

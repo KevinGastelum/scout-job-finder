@@ -11,6 +11,8 @@ export const SOURCE_IDS = [
   "linkedin",
   "usajobs",
   "adzuna",
+  "workable",
+  "teamtailor",
 ] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 

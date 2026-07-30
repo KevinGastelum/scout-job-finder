@@ -27,6 +27,8 @@ const SAFE_URL_FALLBACK: Record<SourceId, string> = {
   linkedin: "https://www.linkedin.com/jobs",
   usajobs: "https://www.usajobs.gov",
   adzuna: "https://www.adzuna.com",
+  workable: "https://apply.workable.com",
+  teamtailor: "https://www.teamtailor.com",
 };
 
 function squash(value: string): string {

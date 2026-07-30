@@ -8,6 +8,10 @@ function urlFor(company: SeedCompany): string {
       return `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(company.token)}`;
     case "lever":
       return `https://api.lever.co/v0/postings/${company.token}?mode=json&limit=1`;
+    case "workable":
+      return `https://apply.workable.com/api/v1/widget/accounts/${encodeURIComponent(company.token)}?details=true`;
+    case "teamtailor":
+      return `https://${company.token}.teamtailor.com/jobs.json`;
   }
 }
 
@@ -21,7 +25,8 @@ async function probe(company: SeedCompany): Promise<string> {
     const body: unknown = await response.json();
     // A 200 carrying the wrong shape is not a live board — it usually means the slug now
     // resolves to some other handler — so require the array the board API promises.
-    const postings = Array.isArray(body) ? body : (body as { jobs?: unknown })?.jobs;
+    const envelope = body as { jobs?: unknown; items?: unknown };
+    const postings = Array.isArray(body) ? body : (envelope?.jobs ?? envelope?.items);
     if (!Array.isArray(postings)) return "unexpected response shape (no postings array)";
     return `ok (${postings.length} postings on the first page)`;
   } catch (error) {

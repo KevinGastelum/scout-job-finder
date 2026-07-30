@@ -118,7 +118,9 @@ export { JobicyAdapter } from "./adapters/jobicy";
 export { LeverAdapter } from "./adapters/lever";
 export { LinkedInAdapter, QUERIES as LINKEDIN_QUERIES } from "./adapters/linkedin";
 export { RemotiveAdapter } from "./adapters/remotive";
+export { TeamtailorAdapter } from "./adapters/teamtailor";
 export { TheMuseAdapter } from "./adapters/themuse";
+export { WorkableAdapter } from "./adapters/workable";
 export {
   UsaJobsAdapter,
   QUERIES as USAJOBS_QUERIES,

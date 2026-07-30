@@ -1,0 +1,57 @@
+{
+  "version": "https://jsonfeed.org/version/1",
+  "title": "Acme AI jobs",
+  "home_page_url": "https://acme.na.teamtailor.com/jobs",
+  "feed_url": "https://acme.na.teamtailor.com/jobs.json",
+  "items": [
+    {
+      "id": "51d8da44-b6b4-4f9a-8270-eb0ff12dfb64",
+      "title": "Data Engineer",
+      "url": "https://acme.na.teamtailor.com/jobs/657855-data-engineer",
+      "date_published": "2026-07-03T13:53:14-07:00",
+      "content_html": "<p>Build the <strong>warehouse</strong>.</p>",
+      "_jobposting": {
+        "@context": "http://schema.org/",
+        "@type": "JobPosting",
+        "title": "Data Engineer",
+        "description": "<p>Build the <strong>warehouse</strong> &amp; own the pipeline.</p>",
+        "datePosted": "2026-07-03T13:53:14-07:00",
+        "jobLocation": [
+          {
+            "@type": "Place",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "101 New Montgomery St",
+              "addressLocality": "San Francisco",
+              "postalCode": "94105-3623",
+              "addressCountry": "US",
+              "addressRegion": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "9f1c0e22-2b77-4d18-9c31-70f0a4c1b111",
+      "title": "Senior Product Designer",
+      "url": "https://acme.na.teamtailor.com/jobs/657901-senior-product-designer",
+      "date_published": "2026-05-14T09:34:03-07:00",
+      "content_html": "<p>Design the product.</p>",
+      "_jobposting": {
+        "@context": "http://schema.org/",
+        "@type": "JobPosting",
+        "title": "Senior Product Designer",
+        "description": "   ",
+        "datePosted": "2026-05-14T09:34:03-07:00",
+        "jobLocation": []
+      }
+    },
+    {
+      "id": "",
+      "title": "Ghost Role",
+      "url": "https://acme.na.teamtailor.com/jobs/000000-ghost",
+      "date_published": "2026-05-01T00:00:00-07:00",
+      "content_html": "<p>No id.</p>"
+    }
+  ]
+}

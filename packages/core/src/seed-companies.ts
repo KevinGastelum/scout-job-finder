@@ -1,6 +1,6 @@
 import { normalizeCompany } from "./taxonomy";
 
-export type BoardKind = "greenhouse" | "lever" | "ashby";
+export type BoardKind = "greenhouse" | "lever" | "ashby" | "workable" | "teamtailor";
 
 export interface SeedCompany {
   name: string;
@@ -30,9 +30,6 @@ export const SEED_COMPANIES: SeedCompany[] = [
   // Weights & Biases is part of CoreWeave and no longer runs a board of its own — its roles are
   // in the CoreWeave board above. Left here so it is not re-probed as an unsolved target.
   { name: "Weights and Biases", board: "greenhouse", token: "weightsandbiases", verified: false },
-  // Hugging Face is on Workable, not Greenhouse: `apply.workable.com/api/v1/widget/accounts/
-  // huggingface?details=true` serves its postings. Stays unverified until a Workable adapter exists.
-  { name: "Hugging Face", board: "greenhouse", token: "huggingface", verified: false },
   // Replicate lists its roles inline on `replicate.com/about#open-roles` with no ATS behind them,
   // so there is nothing to fetch — apply from that page directly.
   { name: "Replicate", board: "greenhouse", token: "replicate", verified: false },
@@ -75,9 +72,6 @@ export const SEED_COMPANIES: SeedCompany[] = [
   { name: "Lakera", board: "ashby", token: "lakera.ai", verified: true },
   { name: "LangChain", board: "ashby", token: "langchain", verified: true },
   { name: "Legora", board: "ashby", token: "legora", verified: true },
-  // Lindy is on Teamtailor at `lindy.na.teamtailor.com/jobs.json` (a keyless JSON Feed), not
-  // Ashby. Stays unverified until a Teamtailor adapter exists.
-  { name: "Lindy", board: "ashby", token: "lindy", verified: false },
   { name: "LlamaIndex", board: "ashby", token: "llamaindex", verified: true },
   { name: "Lovable", board: "ashby", token: "lovable", verified: true },
   { name: "Modal Labs", board: "ashby", token: "modal", verified: true },
@@ -99,6 +93,13 @@ export const SEED_COMPANIES: SeedCompany[] = [
   { name: "WorkOS", board: "ashby", token: "workos", verified: true },
   { name: "Zapier", board: "ashby", token: "zapier", verified: true },
   { name: "n8n", board: "ashby", token: "n8n", verified: true },
+
+  { name: "Hugging Face", board: "workable", token: "huggingface", verified: true },
+
+  // Teamtailor boards are region-sharded and the region is part of the hostname, so the token
+  // carries it: `lindy.na` resolves to lindy.na.teamtailor.com. A token without a region dot
+  // would 404 even though the company slug is right.
+  { name: "Lindy", board: "teamtailor", token: "lindy.na", verified: true },
 ];
 
 export function seedCompaniesFor(board: BoardKind): SeedCompany[] {
