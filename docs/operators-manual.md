@@ -23,6 +23,34 @@ Practical runbook for the single human operator (Kevin).
 4. **Triage candidates**: Update job statuses (`shortlisted`, `dismissed`, `applied`).
 5. **Apply**: Apply to top matching positions manually via direct job links.
 
+### Running it unattended (Windows)
+
+Register the scheduled task once and step 1 happens on its own:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\register-daily-scan.ps1
+```
+
+- Defaults to 07:00 daily. `-At 06:30` moves it, `-Unregister` removes it, re-running replaces it.
+- Runs `bun run scan` then `bun run intel`, appending both to `.tmp/daily-scan.log` (gitignored). `intel` runs even if the scan reported source errors, because a partial scan still collected most boards.
+- A missed run (machine asleep at 07:00) fires when the machine next wakes rather than being skipped.
+- **It only runs while you're logged on.** The scan shells out to the `claude` CLI, which needs your logged-in session — running the task as SYSTEM or with stored credentials would find no authentication.
+- Force a run now: `Start-ScheduledTask -TaskName 'Scout Daily Scan'`. Check the last result: `Get-ScheduledTaskInfo -TaskName 'Scout Daily Scan'`.
+
+### Cadence and what a scan actually costs
+
+Once a day is the right frequency. Company boards refresh on roughly a daily rhythm, so a second scan re-fetches the same postings — it pays the full network cost and gets almost nothing new.
+
+The rubric cache is keyed on the posting's description hash, the rubric version, the prompt version, the profile version, and the model id. A steady-state daily scan therefore only spends LLM calls on genuinely new shortlist entries — typically a couple of dozen, not the full shortlist.
+
+Three things invalidate the whole cache and cost a full re-score (currently ~215 calls, ceiling 250):
+
+- editing `profile/profile.md` or re-ingesting into a changed skill set (`profile.version`)
+- editing the rubric prompt or its schema (`prompt.version` / `rubric.version`)
+- changing `SCOUT_MODEL` (`model_id`)
+
+Batch those edits and let one scan absorb them.
+
 ## As needed
 
 ### Profile & Ingestion Updates
