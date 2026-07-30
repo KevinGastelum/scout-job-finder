@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HttpError, type HttpClient } from "../src/http";
-import { fetchGithubRepos, MAX_REPOS } from "../src/ingest/github";
+import { fetchGithubRepos, MAX_REPOS, MAX_REPOS_AUTHENTICATED } from "../src/ingest/github";
 
 function fakeHttp(routes: Record<string, unknown>): HttpClient & { calls: string[] } {
   const calls: string[] = [];
@@ -167,5 +167,102 @@ describe("fetchGithubRepos", () => {
     }
     const repos = await fetchGithubRepos(fakeHttp(routes), "kev", tempCacheDir());
     expect(repos.length).toBe(MAX_REPOS);
+  });
+});
+
+describe("fetchGithubRepos authenticated", () => {
+  test("lists /user/repos?affiliation=owner and caps at MAX_REPOS_AUTHENTICATED", async () => {
+    const listing = Array.from({ length: 70 }, (_, index) => ({
+      name: `repo-${index}`,
+      owner: { login: "kev" },
+      description: null,
+      html_url: `https://github.com/kev/repo-${index}`,
+      language: null,
+      topics: [],
+      stargazers_count: 0,
+      pushed_at: `2026-07-${String((index % 28) + 1).padStart(2, "0")}T00:00:00Z`,
+      fork: false,
+      private: false,
+    }));
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed": listing,
+    };
+    for (const item of listing) {
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = {};
+    }
+    const http = fakeHttp(routes);
+    const repos = await fetchGithubRepos(http, "kev", tempCacheDir(), { authenticated: true });
+    expect(repos.length).toBe(MAX_REPOS_AUTHENTICATED);
+    expect(http.calls[0]).toBe(
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed",
+    );
+  });
+
+  test("unauthenticated run still requests /users/{user}/repos and caps at MAX_REPOS", async () => {
+    const http = fakeHttp(routesFor(LISTING));
+    await fetchGithubRepos(http, "kev", tempCacheDir());
+    expect(http.calls[0]).toBe("https://api.github.com/users/kev/repos?per_page=100&sort=pushed");
+  });
+
+  test("drops size: 0 items from the listing", async () => {
+    const listingWithEmpty = [
+      ...LISTING,
+      { name: "empty-repo", pushed_at: "2026-05-15T00:00:00Z", fork: false, size: 0 },
+    ];
+    const repos = await fetchGithubRepos(
+      fakeHttp(routesFor(listingWithEmpty)),
+      "kev",
+      tempCacheDir(),
+    );
+    expect(repos.map((repo) => repo.name)).not.toContain("empty-repo");
+  });
+
+  test("surfaces private: true on the returned repo", async () => {
+    const listingWithPrivate = LISTING.map((item) =>
+      item.name === "warren" ? { ...item, private: true } : item,
+    );
+    const repos = await fetchGithubRepos(
+      fakeHttp(routesFor(listingWithPrivate)),
+      "kev",
+      tempCacheDir(),
+    );
+    expect(repos.find((repo) => repo.name === "warren")?.private).toBe(true);
+    expect(repos.find((repo) => repo.name === "quiet")?.private).toBe(false);
+  });
+
+  test("cache filename uses the listing's owner.login, not the user argument", async () => {
+    const cacheDir = tempCacheDir();
+    const listingWithOwner = [
+      {
+        name: "warren",
+        owner: { login: "someorg" },
+        description: "Agent control plane",
+        html_url: "https://github.com/someorg/warren",
+        language: "TypeScript",
+        topics: [],
+        stargazers_count: 1,
+        pushed_at: "2026-07-01T00:00:00Z",
+        fork: false,
+      },
+    ];
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": listingWithOwner,
+      "https://api.github.com/repos/someorg/warren/languages": { TypeScript: 1 },
+    };
+    await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
+    expect(await Bun.file(join(cacheDir, "someorg--warren.json")).exists()).toBe(true);
+  });
+
+  test("authenticated rate-limit error mentions 5000, not 60", async () => {
+    const limited = fakeHttp({
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed": new HttpError(
+        403,
+        "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed",
+        "API rate limit exceeded",
+      ),
+    });
+    await expect(
+      fetchGithubRepos(limited, "kev", tempCacheDir(), { authenticated: true }),
+    ).rejects.toThrow("5000");
   });
 });

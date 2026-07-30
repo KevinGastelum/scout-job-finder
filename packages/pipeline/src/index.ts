@@ -141,7 +141,22 @@ export {
   type FunnelSummary,
   type RetrievalCandidate,
 } from "./funnel";
-export { GITHUB_API, MAX_REPOS, fetchGithubRepos, type GithubRepo } from "./ingest/github";
+export {
+  GITHUB_API,
+  MAX_REPOS,
+  MAX_REPOS_AUTHENTICATED,
+  fetchGithubRepos,
+  type GithubRepo,
+} from "./ingest/github";
+export {
+  MAX_LOCAL_DEPS,
+  MAX_LOCAL_README_CHARS,
+  defaultLocalRoots,
+  localReposNotOnGithub,
+  scanLocalRepos,
+  type LocalRepo,
+} from "./ingest/local";
+export { resolveGithubToken } from "./ingest/token";
 export {
   EXTRACT_BATCH_SIZE,
   PROFILE_EXTRACT_PROMPT_VERSION,
