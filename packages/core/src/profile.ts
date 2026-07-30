@@ -1,3 +1,4 @@
+import { envOr } from "./env";
 import { sha256 } from "./hash";
 import { normalizeCompany } from "./taxonomy";
 import {
@@ -179,7 +180,7 @@ export function mergeGeneratedProfile(
 }
 
 export function defaultProfilePath(): string {
-  return process.env.SCOUT_PROFILE ?? "profile/profile.json";
+  return envOr("SCOUT_PROFILE", "profile/profile.json");
 }
 
 export async function loadProfile(path: string = defaultProfilePath()): Promise<CapabilityProfile> {

@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import { envOr } from "./env";
 
 const MIGRATION_FILES = [
   "001_initial.sql",
@@ -43,7 +44,7 @@ export async function openDb(path: string): Promise<Database> {
 }
 
 export function defaultDbPath(): string {
-  return process.env.SCOUT_DB ?? "scout.db";
+  return envOr("SCOUT_DB", "scout.db");
 }
 
 export type { Database };

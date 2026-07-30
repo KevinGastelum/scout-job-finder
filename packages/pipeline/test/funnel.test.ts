@@ -9,10 +9,12 @@ import {
   type CapabilityProfile,
   type NormalizedJob,
 } from "@scout/core";
+import type { ZodType } from "zod";
 import fixture from "./fixtures/rubric-response.json";
+import type { LlmClient } from "../src/llm/client";
 import { MockLlmClient } from "../src/llm/mock";
 import { RUBRIC_VERSION } from "../src/funnel/rubric";
-import { runFunnel } from "../src/funnel";
+import { RUBRIC_CONCURRENCY, runFunnel } from "../src/funnel";
 
 const PROFILE: CapabilityProfile = {
   version: "abc123abc123",
@@ -238,6 +240,44 @@ describe("runFunnel", () => {
     expect(summary.scored).toBe(0);
     expect(summary.errors.length).toBeGreaterThan(0);
     expect(summary.errors[0]).toContain("scoring failed");
+    db.close();
+  });
+
+  test("scores in parallel without exceeding the concurrency limit", async () => {
+    const seeds: JobSeed[] = Array.from({ length: RUBRIC_CONCURRENCY * 2 }, (_unused, index) => ({
+      ...(SEEDS[0] as JobSeed),
+      nativeId: `parallel-${index}`,
+      descriptionHash: `parallel-hash-${index}`,
+    }));
+    const { db } = await seedDb(seeds);
+
+    class TrackingLlmClient implements LlmClient {
+      readonly modelId = "mock-model";
+      inFlight = 0;
+      peak = 0;
+      calls = 0;
+
+      async generateStructured<T>(_prompt: string, schema: ZodType<T>): Promise<T> {
+        this.calls += 1;
+        this.inFlight += 1;
+        this.peak = Math.max(this.peak, this.inFlight);
+        await Bun.sleep(5);
+        this.inFlight -= 1;
+        return schema.parse(fixture);
+      }
+    }
+
+    const llm = new TrackingLlmClient();
+    const summary = await runFunnel({
+      db,
+      profile: PROFILE,
+      llm,
+      now: () => new Date("2026-07-28T12:00:00.000Z"),
+    });
+
+    expect(summary.scored).toBe(seeds.length);
+    expect(llm.calls).toBe(seeds.length);
+    expect(llm.peak).toBe(RUBRIC_CONCURRENCY);
     db.close();
   });
 });

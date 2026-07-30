@@ -1,7 +1,8 @@
 import { fileURLToPath } from "node:url";
-import { defaultDbPath, loadProfile, openDb } from "@scout/core";
+import { defaultDbPath, envOr, loadProfile, openDb } from "@scout/core";
 import {
   ClaudeCliClient,
+  AdzunaAdapter,
   ArbeitnowAdapter,
   AshbyAdapter,
   GreenhouseAdapter,
@@ -9,9 +10,11 @@ import {
   HnAdapter,
   JobicyAdapter,
   LeverAdapter,
+  LinkedInAdapter,
   RUBRIC_VERSION,
   RemotiveAdapter,
   TheMuseAdapter,
+  UsaJobsAdapter,
   createDbHnCache,
   createHttpClient,
   runScan,
@@ -20,7 +23,7 @@ import { createApp } from "./app";
 import { resolveStaticPath } from "./static-path";
 
 const db = await openDb(defaultDbPath());
-const port = Number(process.env.SCOUT_PORT ?? 8787);
+const port = Number(envOr("SCOUT_PORT", "8787"));
 const distDir = fileURLToPath(new URL("../../web/dist/", import.meta.url));
 
 const handleApi = createApp({
@@ -38,6 +41,9 @@ const handleApi = createApp({
         new ArbeitnowAdapter(),
         new HimalayasAdapter(),
         new JobicyAdapter(),
+        new LinkedInAdapter(),
+        new UsaJobsAdapter(),
+        new AdzunaAdapter(),
         new HnAdapter(createDbHnCache(db)),
       ],
       http: createHttpClient(),

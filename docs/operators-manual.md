@@ -26,10 +26,10 @@ Practical runbook for the single human operator (Kevin).
 ## As needed
 
 ### Profile & Ingestion Updates
-- **Re-ingest after repo or resume changes**: After pushing new repos, cloning work locally, or editing `profile/resume.md`, re-run `bun run ingest` (`just ingest`). Ingest is cached per document, so only changed documents trigger re-extraction. Re-scoring of affected jobs happens gradually (up to 25 rubric calls per scan).
+- **Re-ingest after repo or resume changes**: After pushing new repos, cloning work locally, or editing `profile/resume.md`, re-run `bun run ingest` (`just ingest`). Ingest is cached per document, so only changed documents trigger re-extraction. Every affected job is re-scored on the next scan, up to a ceiling of 250 rubric calls.
 - **Scan different local roots**: Set `SCOUT_LOCAL_REPO_ROOTS` to a comma-separated list of directories to override the default `~/Documents/Coding` + `~/Projects`. Repos are found one and two levels deep.
 - **Update manual profile**: After editing `profile/profile.md`, recompile by running `bun run profile` (`just profile`).
-- **Batch profile edits**: Every edit to `profile/profile.md` or to the generated skill set changes `profile.version`, which re-queues rubric scoring at 25 jobs per scan. Make all your edits, then ingest once.
+- **Batch profile edits**: Every edit to `profile/profile.md` or to the generated skill set changes `profile.version`, which invalidates the rubric cache and re-queues the whole shortlist for scoring. Make all your edits, then ingest once.
 
 ### Market intel
 - **Refresh the demand report**: Run `just intel` after a scan. It reads only the local database — zero LLM calls, zero network — and writes two files.
@@ -37,6 +37,12 @@ Practical runbook for the single human operator (Kevin).
 - `profile/skill-roadmap.md` is **append-only**: new gaps get appended, and nothing already in the file is rewritten. Tick items off with `- [x]` and add your own notes freely; the next run preserves them.
 - **Ranking is by distinct companies, not postings.** One employer can post hundreds of roles, so posting counts measure that company's hiring volume, not market demand. A skill wanted by 8 companies beats one repeated across 40 postings from a single company.
 - **Promote useful terms**: the report lists frequent terms the skill lexicon doesn't know. Adding a real one to `packages/core/src/lexicon.ts` makes it rank in the main tables and improves search recall.
+
+### Finding a missing company board
+- **When a company you want isn't in the scan**: run `bun run scripts/discover-board.ts "Company Name=company.com"`. It reports the ATS it found and, when the provider has a keyless feed, how many postings that token serves. Add a confirmed hit to `packages/core/src/seed-companies.ts` with `verified: true`.
+- **Confirm identity before trusting a hit.** Board slugs collide across unrelated companies — probing `lindy` on Recruitee returns a real board belonging to a German cable distributor. Open the reported feed and read a few titles first.
+- **A hit with 0 postings is not a board.** SmartRecruiters answers any parseable slug with an empty list, so the script requires at least one posting before reporting.
+- **Acquisitions and rebrands are the common cause of a dead token**, not a broken script: Codeium's roles moved to Cognition's board, Weights & Biases' to CoreWeave's, and TravelPerk's followed its rename to Perk.
 
 ### Troubleshooting
 - **`bun: command not found`**: Bun installs to `~/.bun/bin`, which some shells (and MSYS2) don't pick up. Add it to `PATH`: `export PATH="$HOME/.bun/bin:$PATH"`.
@@ -51,6 +57,7 @@ Practical runbook for the single human operator (Kevin).
 | Command | What it does | Network / LLM cost |
 | --- | --- | --- |
 | `just ingest` (`bun run ingest`) | Extracts GitHub repos (private too, with a token), local git checkouts, and `profile/resume.md` into `profile/generated.json`, then recompiles `profile/profile.json` | GitHub: 1 listing call + 2 per uncached repo (≤41 unauthenticated, ≤243 authenticated). Local repo scan is filesystem-only. Plus one `claude` call per changed document — unchanged documents are served from cache |
-| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, The Muse, Arbeitnow, Himalayas, Jobicy, and HN, deduplicates, and scores candidates | Source job APIs + up to 25 `claude` LLM rubric calls |
+| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, The Muse, Arbeitnow, Himalayas, Jobicy, LinkedIn, USAJobs, Adzuna, and HN, deduplicates, and scores candidates | Source job APIs + up to 250 `claude` LLM rubric calls, 5 at a time. Only postings new since the last scan cost a call — the rest come from cache. USAJobs and Adzuna each skip with a message if their keys are unset — the rest of the scan is unaffected |
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
+| `bun run scripts/discover-board.ts [Name=domain ...]` | Finds the applicant tracking system behind a company's careers page: fingerprints the HTML, falls back to its JS bundles, reports any embedded posting JSON, then probes every keyless board API for the likely tokens. With no arguments it runs the `verified: false` seed rows | Careers page + up to 12 bundles + one probe per provider/token pair, paced at 300ms. 0 LLM |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |

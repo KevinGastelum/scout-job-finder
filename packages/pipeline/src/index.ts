@@ -109,14 +109,21 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
   return { runId, stats, scored: funnel?.scored ?? 0, funnel };
 }
 
+export { AdzunaAdapter, QUERIES as ADZUNA_QUERIES, adzunaCredentials } from "./adapters/adzuna";
 export { ArbeitnowAdapter } from "./adapters/arbeitnow";
 export { AshbyAdapter } from "./adapters/ashby";
 export { GreenhouseAdapter } from "./adapters/greenhouse";
 export { HimalayasAdapter } from "./adapters/himalayas";
 export { JobicyAdapter } from "./adapters/jobicy";
 export { LeverAdapter } from "./adapters/lever";
+export { LinkedInAdapter, QUERIES as LINKEDIN_QUERIES } from "./adapters/linkedin";
 export { RemotiveAdapter } from "./adapters/remotive";
 export { TheMuseAdapter } from "./adapters/themuse";
+export {
+  UsaJobsAdapter,
+  QUERIES as USAJOBS_QUERIES,
+  usaJobsClientFromEnv,
+} from "./adapters/usajobs";
 export {
   HN_PROMPT_VERSION,
   HnAdapter,
@@ -124,6 +131,20 @@ export {
   createDbHnCache,
   type HnExtractionCache,
 } from "./adapters/hn";
+export {
+  ATS_PROVIDERS,
+  detectAts,
+  discoverEmbeddedJson,
+  postingLikeScore,
+  postingsArray,
+  scriptBlocks,
+  scriptSources,
+  tokenCandidates,
+  type AtsHit,
+  type AtsProvider,
+  type JsonRoot,
+  type ScriptBlock,
+} from "./discovery";
 export { createHttpClient, HttpError, type HttpClient } from "./http";
 export { ClaudeCliClient, DEFAULT_MODEL, type LlmClient } from "./llm/client";
 export { MockLlmClient } from "./llm/mock";
@@ -137,6 +158,7 @@ export type {
 } from "./adapters/types";
 export {
   DEFAULT_RUBRIC_BUDGET,
+  RUBRIC_CONCURRENCY,
   RUBRIC_PROMPT_VERSION,
   RUBRIC_VERSION,
   applyHardFilters,

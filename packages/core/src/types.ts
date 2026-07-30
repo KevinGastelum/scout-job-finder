@@ -8,6 +8,9 @@ export const SOURCE_IDS = [
   "arbeitnow",
   "himalayas",
   "jobicy",
+  "linkedin",
+  "usajobs",
+  "adzuna",
 ] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 

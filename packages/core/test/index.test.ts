@@ -31,6 +31,6 @@ describe("core barrel", () => {
       expect(typeof (core as Record<string, unknown>)[name]).toBe("function");
     }
     expect(core.MAX_MISSED_RUNS).toBe(3);
-    expect(core.SOURCE_IDS.length).toBe(9);
+    expect(core.SOURCE_IDS.length).toBe(12);
   });
 });

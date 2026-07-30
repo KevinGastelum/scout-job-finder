@@ -1,8 +1,13 @@
-import { mergeGeneratedProfile, parseGeneratedProfile, parseProfileMarkdown } from "@scout/core";
+import {
+  envOr,
+  mergeGeneratedProfile,
+  parseGeneratedProfile,
+  parseProfileMarkdown,
+} from "@scout/core";
 
-const source = process.env.SCOUT_PROFILE_MD ?? "profile/profile.md";
-const target = process.env.SCOUT_PROFILE ?? "profile/profile.json";
-const generatedPath = process.env.SCOUT_PROFILE_GENERATED ?? "profile/generated.json";
+const source = envOr("SCOUT_PROFILE_MD", "profile/profile.md");
+const target = envOr("SCOUT_PROFILE", "profile/profile.json");
+const generatedPath = envOr("SCOUT_PROFILE_GENERATED", "profile/generated.json");
 
 const file = Bun.file(source);
 if (!(await file.exists())) {

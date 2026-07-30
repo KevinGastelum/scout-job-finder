@@ -21,6 +21,29 @@ describe("createHttpClient", () => {
     expect(await client.getJson<{ ok: boolean }>("https://x.test/a")).toEqual({ ok: true });
   });
 
+  // HttpClient takes no per-request headers, so a source that authenticates on a header can
+  // only work by pinning it to its own client at construction — USAJobs does exactly that.
+  test("sends the configured headers and user agent on every attempt", async () => {
+    const seen: Array<Record<string, string>> = [];
+    const client = createHttpClient({
+      minIntervalMs: 0,
+      baseDelayMs: 1,
+      userAgent: "someone@example.com",
+      headers: { "Authorization-Key": "test-key" },
+      fetchImpl: async (_url, init) => {
+        seen.push(init.headers as Record<string, string>);
+        return seen.length === 1 ? new Response("wait", { status: 503 }) : Response.json({ ok: 1 });
+      },
+    });
+
+    await client.getJson("https://x.test/a");
+    expect(seen.length).toBe(2);
+    for (const headers of seen) {
+      expect(headers["Authorization-Key"]).toBe("test-key");
+      expect(headers["user-agent"]).toBe("someone@example.com");
+    }
+  });
+
   test("retries 5xx then succeeds", async () => {
     const client = createHttpClient({
       minIntervalMs: 0,

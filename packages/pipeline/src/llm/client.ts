@@ -1,3 +1,4 @@
+import { envOr } from "@scout/core";
 import type { ZodType } from "zod";
 
 export const DEFAULT_MODEL = "claude-sonnet-5";
@@ -153,7 +154,7 @@ export class ClaudeCliClient implements LlmClient {
   private readonly run: CliRunner;
 
   constructor(options: ClaudeCliOptions = {}) {
-    const modelId = options.modelId ?? process.env.SCOUT_MODEL ?? DEFAULT_MODEL;
+    const modelId = options.modelId ?? envOr("SCOUT_MODEL", DEFAULT_MODEL);
     if (!MODEL_ID_PATTERN.test(modelId)) throw new Error(`invalid model id: ${modelId}`);
     this.modelId = modelId;
     this.run = options.run ?? createProcessRunner(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);

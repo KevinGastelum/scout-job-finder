@@ -7,11 +7,20 @@ import {
 } from "../src/seed-companies";
 
 describe("SEED_COMPANIES", () => {
-  test("covers at least thirty companies across every board", () => {
+  test("covers at least thirty companies and keeps every board populated", () => {
     expect(SEED_COMPANIES.length).toBeGreaterThanOrEqual(30);
-    expect(seedCompaniesFor("greenhouse").length).toBeGreaterThanOrEqual(15);
-    expect(seedCompaniesFor("lever").length).toBeGreaterThanOrEqual(8);
-    expect(seedCompaniesFor("ashby").length).toBeGreaterThanOrEqual(20);
+    for (const board of ["greenhouse", "lever", "ashby"] as const) {
+      expect(seedCompaniesFor(board).length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  // The adapters fetch only verified rows, so an unverified seed is a silently absent employer:
+  // the scan reports zero errors and the company just never appears. Guarding the ratio forces
+  // whoever adds a token to probe it rather than parking it at the default and moving on.
+  test("keeps all but a handful of seeds verified", () => {
+    const unverified = SEED_COMPANIES.filter((company) => !company.verified);
+    expect(unverified.length).toBeLessThanOrEqual(8);
+    expect(SEED_COMPANIES.length - unverified.length).toBeGreaterThanOrEqual(50);
   });
 
   test("has no duplicate board plus token pairs", () => {

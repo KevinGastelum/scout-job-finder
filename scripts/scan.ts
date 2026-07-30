@@ -1,6 +1,7 @@
 import { defaultDbPath, getLatestRun, listActiveJobs, loadProfile, openDb } from "@scout/core";
 import {
   ClaudeCliClient,
+  AdzunaAdapter,
   ArbeitnowAdapter,
   AshbyAdapter,
   GreenhouseAdapter,
@@ -8,8 +9,10 @@ import {
   HnAdapter,
   JobicyAdapter,
   LeverAdapter,
+  LinkedInAdapter,
   RemotiveAdapter,
   TheMuseAdapter,
+  UsaJobsAdapter,
   createDbHnCache,
   createHttpClient,
   runScan,
@@ -31,6 +34,9 @@ const summary = await runScan({
     new ArbeitnowAdapter(),
     new HimalayasAdapter(),
     new JobicyAdapter(),
+    new LinkedInAdapter(),
+    new UsaJobsAdapter(),
+    new AdzunaAdapter(),
     new HnAdapter(createDbHnCache(db)),
   ],
   http,

@@ -1,4 +1,4 @@
-import { sha256 } from "@scout/core";
+import { envOr, sha256 } from "@scout/core";
 import {
   ClaudeCliClient,
   classifyLocalRepo,
@@ -13,7 +13,7 @@ import {
 } from "@scout/pipeline";
 import { stat } from "node:fs/promises";
 
-const user = process.env.SCOUT_GITHUB_USER ?? "kevingastelum";
+const user = envOr("SCOUT_GITHUB_USER", "kevingastelum");
 const cacheDir = "profile/cache/github";
 const token = await resolveGithubToken();
 const authenticated = token !== null;

@@ -19,6 +19,9 @@ describe("domain constants", () => {
       "arbeitnow",
       "himalayas",
       "jobicy",
+      "linkedin",
+      "usajobs",
+      "adzuna",
     ]);
   });
 

@@ -24,6 +24,9 @@ const SAFE_URL_FALLBACK: Record<SourceId, string> = {
   arbeitnow: "https://www.arbeitnow.com",
   himalayas: "https://himalayas.app",
   jobicy: "https://jobicy.com",
+  linkedin: "https://www.linkedin.com/jobs",
+  usajobs: "https://www.usajobs.gov",
+  adzuna: "https://www.adzuna.com",
 };
 
 function squash(value: string): string {
