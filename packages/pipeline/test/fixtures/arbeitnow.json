@@ -1,0 +1,41 @@
+{
+  "data": [
+    {
+      "slug": "principal-data-scientist-london-zurich-302530",
+      "company_name": "onrunning",
+      "title": "Principal Data Scientist",
+      "description": "&lt;p&gt;-&lt;/p&gt;&lt;p&gt;Find &lt;a href=&quot;https://www.arbeitnow.co.uk&quot;&gt;Jobs in United Kingdom&lt;/a&gt; on Arbeitnow&lt;/p&gt;",
+      "remote": false,
+      "url": "https://www.arbeitnow.co.uk/jobs/companies/onrunning/principal-data-scientist-london-zurich-302530",
+      "tags": ["Data"],
+      "job_types": [],
+      "location": "London; Zurich",
+      "created_at": 1785327316
+    },
+    {
+      "slug": "senior-backend-engineer-remote-118820",
+      "company_name": "Vector Labs",
+      "title": "Senior Backend Engineer",
+      "description": "<p>Build our core platform in a small, fully remote team.</p>",
+      "remote": true,
+      "url": "https://www.arbeitnow.com/jobs/companies/vector-labs/senior-backend-engineer-remote-118820",
+      "tags": ["Backend", "Remote"],
+      "job_types": ["Full time"],
+      "location": "",
+      "created_at": 1785401755
+    },
+    {
+      "company_name": "No Slug Co",
+      "title": "Ghost Listing",
+      "description": "<p>This entry is missing a slug and should be skipped.</p>",
+      "remote": false,
+      "url": "https://www.arbeitnow.com/jobs/companies/no-slug-co/ghost-listing",
+      "tags": [],
+      "job_types": [],
+      "location": "Berlin, DE",
+      "created_at": 1785398957
+    }
+  ],
+  "links": {},
+  "meta": {}
+}

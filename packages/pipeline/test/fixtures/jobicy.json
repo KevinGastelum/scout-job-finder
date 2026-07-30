@@ -1,0 +1,58 @@
+{
+  "apiVersion": "2.2.15",
+  "documentationUrl": "https://jobi.cy/apidocs",
+  "friendlyNotice": "Thanks for using Jobicy API! Please ensure Jobicy is clearly credited with a direct link to the source, and all application buttons redirect to the original job URL provided in this feed.",
+  "jobCount": 3,
+  "lastUpdate": "2026-07-30T04:25:02+00:00",
+  "appliedFilters": { "count": 50 },
+  "jobs": [
+    {
+      "id": 144845,
+      "url": "https://jobicy.com/jobs/144845-territory-manager-in-training",
+      "jobSlug": "144845-territory-manager-in-training",
+      "jobTitle": "Territory Manager in Training",
+      "companyName": "Ecolab",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/9508514f-221.jpeg",
+      "jobIndustry": ["Sales"],
+      "jobType": ["Full-Time"],
+      "jobGeo": "UK",
+      "jobLevel": "Midweight",
+      "jobExcerpt": "At Ecolab, we help make the world cleaner, safer and healthier.",
+      "jobDescription": "<div><p>At Ecolab, we help make the world <b>cleaner, safer and healthier</b>.</p><p>Institutional &amp; Specialty divisions &gt; laundry.</p></div>",
+      "pubDate": "2026-07-30T04:25:02+00:00",
+      "salaryMin": 52000,
+      "salaryMax": 62000,
+      "salaryCurrency": "USD",
+      "salaryPeriod": "yearly"
+    },
+    {
+      "id": 149832,
+      "url": "https://jobicy.com/jobs/149832-farsi-to-english-translator",
+      "jobSlug": "149832-farsi-to-english-translator",
+      "jobTitle": "Farsi to English Translator",
+      "companyName": "Welo Global",
+      "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2026/06/83c40f94-221.webp",
+      "jobIndustry": ["Translation"],
+      "jobType": ["Contract"],
+      "jobGeo": "Anywhere",
+      "jobLevel": "Midweight",
+      "jobExcerpt": "Translate life sciences documents from Farsi to English&hellip;",
+      "jobDescription": "",
+      "pubDate": "2026-07-29T17:35:46+00:00"
+    },
+    {
+      "id": 147463,
+      "url": "https://jobicy.com/jobs/147463-missing-company",
+      "jobSlug": "147463-missing-company",
+      "jobTitle": "Support Engineer",
+      "companyName": "",
+      "jobGeo": "USA",
+      "jobLevel": "Midweight",
+      "jobExcerpt": "Should be skipped for missing companyName.",
+      "jobDescription": "<p>Should be skipped for missing companyName.</p>",
+      "pubDate": "2026-07-29T17:22:46+00:00"
+    }
+  ],
+  "statusCode": 200,
+  "success": true
+}

@@ -109,10 +109,14 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
   return { runId, stats, scored: funnel?.scored ?? 0, funnel };
 }
 
+export { ArbeitnowAdapter } from "./adapters/arbeitnow";
 export { AshbyAdapter } from "./adapters/ashby";
 export { GreenhouseAdapter } from "./adapters/greenhouse";
+export { HimalayasAdapter } from "./adapters/himalayas";
+export { JobicyAdapter } from "./adapters/jobicy";
 export { LeverAdapter } from "./adapters/lever";
 export { RemotiveAdapter } from "./adapters/remotive";
+export { TheMuseAdapter } from "./adapters/themuse";
 export {
   HN_PROMPT_VERSION,
   HnAdapter,
