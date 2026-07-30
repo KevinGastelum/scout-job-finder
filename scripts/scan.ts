@@ -7,7 +7,6 @@ import {
   openDb,
 } from "@scout/core";
 import {
-  ClaudeCliClient,
   AdzunaAdapter,
   ArbeitnowAdapter,
   AshbyAdapter,
@@ -25,14 +24,17 @@ import {
   WorkableAdapter,
   createDbHnCache,
   createHttpClient,
+  extractionLlmFromEnv,
   parseRubricBudget,
+  rubricLlmFromEnv,
   runScan,
 } from "@scout/pipeline";
 
 const db = await openDb(defaultDbPath());
 const profile = await loadProfile();
 const http = createHttpClient();
-const llm = new ClaudeCliClient();
+const llm = rubricLlmFromEnv();
+const adapterLlm = extractionLlmFromEnv();
 const rubricBudget = parseRubricBudget(envValue("SCOUT_RUBRIC_BUDGET"));
 
 const summary = await runScan({
@@ -57,6 +59,7 @@ const summary = await runScan({
   ],
   http,
   llm,
+  adapterLlm,
   profile,
 });
 

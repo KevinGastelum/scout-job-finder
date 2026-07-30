@@ -79,7 +79,50 @@ export function extractJsonObject(text: string): string {
 }
 
 const DEFAULT_COMSPEC = "C:\\Windows\\System32\\cmd.exe";
-const MODEL_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
+export const MODEL_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+export interface StructuredCliCall<T> {
+  prompt: string;
+  schema: ZodType<T>;
+  run: CliRunner;
+  argsFor: (attemptPrompt: string) => string[];
+  readText: (stdout: string) => string;
+  cliName: string;
+  retryDelayMs: number;
+}
+
+export async function generateStructuredViaCli<T>(call: StructuredCliCall<T>): Promise<T> {
+  const base = `${call.prompt}\n\n${JSON_ONLY_INSTRUCTION}`;
+  let attemptPrompt = base;
+  let lastMessage = "";
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0 && call.retryDelayMs > 0) {
+      await Bun.sleep(call.retryDelayMs * 2 ** (attempt - 1));
+    }
+
+    try {
+      const result = await call.run({ args: call.argsFor(attemptPrompt), prompt: attemptPrompt });
+      if (result.exitCode !== 0) {
+        // agy writes its failure envelope to stdout and leaves stderr empty, so falling back to
+        // stdout is the difference between a diagnosable error and a bare exit status.
+        const detail = result.stderr.trim().length > 0 ? result.stderr.trim() : result.stdout.trim();
+        throw new Error(`${call.cliName} CLI exited ${result.exitCode}: ${detail.slice(0, 500)}`);
+      }
+      const text = call.readText(result.stdout);
+      return call.schema.parse(JSON.parse(extractJsonObject(text)));
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : String(error);
+      // The parse error quotes the model's own reply, and a hostile posting can steer what
+      // the model emits. Reflecting it would splice attacker-influenced text into the retry
+      // prompt as prose — outside the JSON envelope every caller relies on. Keep the retry
+      // instruction static; lastMessage is for the thrown error only, which never reaches a model.
+      attemptPrompt = `${base}\n\nYour previous reply was not a single valid JSON object matching the requested shape. Return only the corrected JSON object.`;
+    }
+  }
+
+  throw new Error(`${call.cliName} CLI failed after ${MAX_ATTEMPTS} attempts: ${lastMessage}`);
+}
 
 export interface ExecutableInvocation {
   cmd: string;
@@ -181,36 +224,14 @@ export class ClaudeCliClient implements LlmClient {
       DISALLOWED_TOOLS,
       "--strict-mcp-config",
     ];
-    const base = `${prompt}\n\n${JSON_ONLY_INSTRUCTION}`;
-    let attemptPrompt = base;
-    let lastMessage = "";
-
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
-      if (attempt > 0 && this.retryDelayMs > 0) {
-        await Bun.sleep(this.retryDelayMs * 2 ** (attempt - 1));
-      }
-
-      try {
-        const result = await this.run({ args, prompt: attemptPrompt });
-        if (result.exitCode !== 0) {
-          throw new Error(
-            `claude CLI exited ${result.exitCode}: ${result.stderr.trim().slice(0, 500)}`,
-          );
-        }
-        const text = readResultText(result.stdout);
-        return schema.parse(JSON.parse(extractJsonObject(text)));
-      } catch (error) {
-        lastMessage = error instanceof Error ? error.message : String(error);
-        // The parse error quotes the model's own reply, and a hostile posting can steer what
-        // the model emits. Reflecting it would splice attacker-influenced text into the retry
-        // prompt as prose — outside the JSON envelope every caller relies on. Keep the retry
-        // instruction static; lastMessage is for the thrown error only, which never reaches a model.
-        attemptPrompt = `${base}\n\nYour previous reply was not a single valid JSON object matching the requested shape. Return only the corrected JSON object.`;
-      }
-    }
-
-    throw new Error(
-      `claude CLI failed after ${MAX_ATTEMPTS} attempts: ${lastMessage}`,
-    );
+    return generateStructuredViaCli({
+      prompt,
+      schema,
+      run: this.run,
+      argsFor: () => args,
+      readText: readResultText,
+      cliName: "claude",
+      retryDelayMs: this.retryDelayMs,
+    });
   }
 }

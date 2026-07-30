@@ -1,7 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defaultDbPath, envOr, envValue, loadProfile, openDb } from "@scout/core";
 import {
-  ClaudeCliClient,
   AdzunaAdapter,
   ArbeitnowAdapter,
   AshbyAdapter,
@@ -21,6 +20,8 @@ import {
   WorkableAdapter,
   createDbHnCache,
   createHttpClient,
+  extractionLlmFromEnv,
+  rubricLlmFromEnv,
   runScan,
 } from "@scout/pipeline";
 import { createApp } from "./app";
@@ -69,7 +70,8 @@ const handleApi = createApp({
         new HnAdapter(createDbHnCache(db)),
       ],
       http: createHttpClient(),
-      llm: new ClaudeCliClient(),
+      llm: rubricLlmFromEnv(),
+      adapterLlm: extractionLlmFromEnv(),
       profile: await loadProfile(),
     });
     return { runId: summary.runId };

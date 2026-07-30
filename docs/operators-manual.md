@@ -119,3 +119,42 @@ Two related variables matter only when something other than your own browser rea
 server: `SCOUT_HOST` changes the bind address away from loopback, and `SCOUT_TRUSTED_HOSTS`
 lists hostnames accepted besides loopback. The server has no authentication, so change
 neither unless something in front of it does.
+
+## Moving the legwork off the Claude subscription
+
+A scan makes two kinds of LLM call. Extraction pulls fields out of free-form text — an HN
+"Who's Hiring" comment, a repo README during `ingest` — and is mechanical enough that a cheap
+model does it as well as an expensive one. The rubric is the judgement the whole shortlist
+rests on. `SCOUT_EXTRACT_LLM=agy` moves only the first onto the Antigravity CLI:
+
+```bash
+SCOUT_EXTRACT_LLM=agy bun run scan
+SCOUT_EXTRACT_LLM=agy bun run ingest
+```
+
+| Variable | Values | Effect |
+| --- | --- | --- |
+| `SCOUT_LLM` | `claude` (default), `agy` | Client for every stage, including the rubric |
+| `SCOUT_EXTRACT_LLM` | `claude`, `agy` | Overrides `SCOUT_LLM` for extraction only |
+| `SCOUT_MODEL` | any claude model id | Default `claude-sonnet-5` |
+| `SCOUT_AGY_MODEL` | any id from `agy models` | Default `gemini-3.6-flash-high` |
+
+An unrecognised value stops the run instead of falling back, because a typo would otherwise
+bill a whole scan to the wrong subscription silently.
+
+Three practical notes before you switch the rubric itself over with `SCOUT_LLM=agy`:
+
+- **agy is slow per call.** A trivial prompt measured 48 seconds; every invocation reloads a
+  ~22k-token system prompt. `claude -p` answers the same prompt in a few seconds. A 250-posting
+  rubric budget at five concurrent calls is minutes on Claude and closer to forty on agy.
+- **agy has no stdin path**, so the prompt travels in argv, and Windows caps a command line at
+  32,767 characters. The client refuses anything over 28,000 rather than letting `CreateProcess`
+  fail with a generic error — and a rubric prompt carrying an 18k-character description can get
+  close.
+- **The scores are not calibrated against each other.** Cached rubric rows are keyed by model,
+  so switching clients re-scores rather than mixing, but a shortlist assembled from two models'
+  numbers is not one ranking. Pick one for scoring and stay on it.
+
+Both clients spawn a locally installed CLI that is already logged in. There is no API key and
+no SDK in the tree either way; `agy` must be on `PATH` (or at
+`%LOCALAPPDATA%\agy\bin\agy.exe`) and signed in, exactly as `claude` must be.

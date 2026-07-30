@@ -1,9 +1,9 @@
 import { envOr, sha256 } from "@scout/core";
 import {
-  ClaudeCliClient,
   classifyLocalRepo,
   createHttpClient,
   defaultLocalRoots,
+  extractionLlmFromEnv,
   extractProfileInventory,
   fetchGithubRepos,
   loadResumeDocument,
@@ -23,7 +23,7 @@ const http = createHttpClient({
   retries: 1,
   headers: authenticated ? { authorization: `Bearer ${token}` } : undefined,
 });
-const llm = new ClaudeCliClient();
+const llm = extractionLlmFromEnv();
 
 console.log(
   `Listing ${authenticated ? "owned repos (public + private)" : "public repos"} for ${user}...`,

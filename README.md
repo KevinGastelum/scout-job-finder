@@ -77,7 +77,29 @@ Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MO
 `claude -p`, default `claude-sonnet-5`), `SCOUT_PORT` (server port, default `8787`),
 `SCOUT_HOST` (bind address, default `127.0.0.1`), `SCOUT_TRUSTED_HOSTS` (hostnames accepted
 besides loopback), `SCOUT_RUBRIC_BUDGET` (postings scored per scan, default `250`; `0` fetches
-and filters without touching the LLM stage). See `.env.example` for the rest.
+and filters without touching the LLM stage), `SCOUT_LLM` (`claude` or `agy`, default `claude`),
+`SCOUT_EXTRACT_LLM` (same values, overrides `SCOUT_LLM` for extraction only),
+`SCOUT_AGY_MODEL` (model for `agy --print`, default `gemini-3.6-flash-high`). See
+`.env.example` for the rest.
+
+### Splitting the LLM work across two subscriptions
+
+Two kinds of LLM call happen in a scan, and they are not worth the same money. Extraction is
+mechanical — pull the company, title and comp out of an HN comment or a README — while the
+rubric is the judgement the whole shortlist rests on. `SCOUT_EXTRACT_LLM=agy` moves only the
+first onto the Antigravity (Gemini) CLI and leaves scoring on Claude:
+
+```bash
+SCOUT_EXTRACT_LLM=agy bun run scan
+```
+
+Both clients implement the same `LlmClient` interface and both spawn a locally installed,
+already-logged-in CLI — there is still no API key and no SDK anywhere in the tree. The two
+differ in one way that matters operationally: `claude -p` takes its prompt on stdin, `agy
+--print` takes it in argv, so the agy client refuses a prompt over 28,000 characters rather
+than hitting the Windows command-line limit. It is also markedly slower per call — a trivial
+prompt measured 48s against agy versus a few seconds against `claude -p`, because every agy
+invocation reloads a ~22k-token system prompt. Cheap for legwork, wrong for the hot path.
 
 ## Layout
 

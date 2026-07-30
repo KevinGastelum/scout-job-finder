@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { getLatestRun, listActiveJobs, openDb } from "@scout/core";
 import { runScan } from "../src/index";
 import { MockLlmClient } from "../src/llm/mock";
+import type { LlmClient } from "../src/llm/client";
 import type { HttpClient } from "../src/http";
 import type { AdapterResult, SourceAdapter } from "../src/adapters/types";
 
@@ -137,6 +138,60 @@ describe("runScan", () => {
     const last = await runScan({ ...withoutItem, now: () => new Date("2026-07-31T10:00:00.000Z") });
     expect(last.stats[0]?.expired).toBe(1);
     expect(listActiveJobs(db).length).toBe(0);
+    db.close();
+  });
+
+  // Adapters do mechanical extraction (HN comments); the funnel does the scoring. They can be
+  // billed to different subscriptions, so an adapter must never be handed the rubric's client.
+  test("hands adapters their own llm when one is given", async () => {
+    const db = await openDb(":memory:");
+    const adapterLlm = new MockLlmClient([]);
+    const rubricLlm = new MockLlmClient([]);
+    const seen: LlmClient[] = [];
+
+    await runScan({
+      db,
+      adapters: [
+        {
+          id: "remotive",
+          fetch: async ({ llm }) => {
+            seen.push(llm);
+            return { items: [], queries: [], errors: [] };
+          },
+        },
+      ],
+      http: NOOP_HTTP,
+      llm: rubricLlm,
+      adapterLlm,
+      now: () => new Date("2026-07-28T10:00:00.000Z"),
+    });
+
+    expect(seen[0]).toBe(adapterLlm);
+    db.close();
+  });
+
+  test("falls back to the single llm when no adapter client is given", async () => {
+    const db = await openDb(":memory:");
+    const llm = new MockLlmClient([]);
+    const seen: LlmClient[] = [];
+
+    await runScan({
+      db,
+      adapters: [
+        {
+          id: "remotive",
+          fetch: async (context) => {
+            seen.push(context.llm);
+            return { items: [], queries: [], errors: [] };
+          },
+        },
+      ],
+      http: NOOP_HTTP,
+      llm,
+      now: () => new Date("2026-07-28T10:00:00.000Z"),
+    });
+
+    expect(seen[0]).toBe(llm);
     db.close();
   });
 });

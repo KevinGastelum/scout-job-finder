@@ -12,10 +12,13 @@ Local-first agentic job-finder. Bun workspaces monorepo.
   payload first and fix whichever side is actually wrong. A fixture may add edge cases the live
   feed didn't happen to show, but every field in it must be shaped like something the source
   really serves.
-- No LLM API keys and no LLM SDK. Every LLM call spawns the local `claude` CLI in headless
-  mode (`claude -p --output-format json`, prompt on stdin) behind the `LlmClient` interface,
-  billed against the Claude subscription. That quota is shared with interactive sessions —
-  batch and cache aggressively.
+- No LLM API keys and no LLM SDK. Every LLM call spawns a locally installed, already-logged-in
+  CLI in headless mode behind the `LlmClient` interface: `claude -p --output-format json`
+  (prompt on stdin) or `agy --print --output-format json --mode plan` (prompt in argv, capped
+  at 28k chars). Both bill a subscription, not a token meter. The Claude quota is shared with
+  interactive sessions — batch and cache aggressively. `SCOUT_LLM` picks the client;
+  `SCOUT_EXTRACT_LLM` overrides it for extraction only, so mechanical field-pulling can run on
+  Gemini while the rubric stays on Claude.
 - `profile/` holds personal data and is gitignored except `profile.template.md`.
 
 ## Layout

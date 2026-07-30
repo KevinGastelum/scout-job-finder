@@ -21,6 +21,9 @@ export interface ScanOptions {
   adapters: SourceAdapter[];
   http: HttpClient;
   llm: LlmClient;
+  // Adapters extract fields; the funnel scores. Those are different jobs on different
+  // subscriptions, so an adapter can be pointed at a cheaper CLI without touching the rubric.
+  adapterLlm?: LlmClient;
   profile?: CapabilityProfile;
   now?: () => Date;
   rubricBudget?: number;
@@ -35,6 +38,7 @@ export interface ScanSummary {
 
 export async function runScan(options: ScanOptions): Promise<ScanSummary> {
   const { db, adapters, http, llm } = options;
+  const adapterLlm = options.adapterLlm ?? llm;
   const now = options.now ?? (() => new Date());
   const startedAt = now().toISOString();
   const runId = startRun(db, startedAt);
@@ -54,7 +58,7 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
     };
 
     try {
-      const result = await adapter.fetch({ http, llm, now });
+      const result = await adapter.fetch({ http, llm: adapterLlm, now });
       entry.queries = result.queries;
       entry.errors = [...result.errors];
       entry.fetched = result.items.length;
@@ -150,6 +154,15 @@ export {
 } from "./discovery";
 export { createHttpClient, HttpError, type HttpClient } from "./http";
 export { ClaudeCliClient, DEFAULT_MODEL, type LlmClient } from "./llm/client";
+export { AGY_DEFAULT_MODEL, AGY_MAX_PROMPT_CHARS, AgyCliClient } from "./llm/agy";
+export {
+  LLM_KINDS,
+  createLlmClient,
+  extractionLlmFromEnv,
+  parseLlmKind,
+  rubricLlmFromEnv,
+  type LlmKind,
+} from "./llm/select";
 export { MockLlmClient } from "./llm/mock";
 export { normalizeItem } from "./normalize";
 export { resolveIdentity, titleSimilarity, fingerprint } from "./identity";
