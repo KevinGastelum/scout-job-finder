@@ -52,6 +52,9 @@ export function listShortlist(
          WHERE scores.rubric_version = ?
            AND (? IS NULL OR scores.profile_version = ?)
            AND scores.rubric_score IS NOT NULL
+           -- Rewritten every funnel pass, so tightening a hard filter drops the jobs it now
+           -- rejects on the next run instead of stranding their old scores at the top.
+           AND scores.hard_filter_pass = 1
            AND jobs.status = 'active'
        )
        WHERE rank_in_group = 1

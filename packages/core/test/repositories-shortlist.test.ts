@@ -174,6 +174,26 @@ describe("shortlist read model", () => {
     db.close();
   });
 
+  test("omits jobs the current hard filters reject", async () => {
+    const { db, ids } = await seed([
+      ["keep", 70],
+      ["now-rejected", 88],
+    ]);
+    saveHardFilterResult(db, {
+      jobId: ids["now-rejected"] ?? 0,
+      descriptionHash: "hash-now-rejected",
+      rubricVersion: RUBRIC_VERSION,
+      pass: false,
+      reasons: ["location"],
+      scoredAt: "2026-07-29T10:00:00.000Z",
+    });
+
+    expect(listShortlist(db, RUBRIC_VERSION).map((entry) => entry.job.sourceNativeId)).toEqual([
+      "keep",
+    ]);
+    db.close();
+  });
+
   test("omits expired jobs", async () => {
     const { db, ids } = await seed([["gone", 88]]);
     db.run("UPDATE jobs SET status = 'expired' WHERE id = ?", [ids.gone ?? 0]);
