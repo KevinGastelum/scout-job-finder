@@ -162,6 +162,20 @@ describe("applyHardFilters", () => {
     }
   });
 
+  // The remote branch matched accepted locations a word at a time, so "United Kingdom (Remote)"
+  // was accepted for sharing "united" with "united states". Three live postings leaked this way.
+  test("rejects a remote posting whose country merely shares a word with an accepted one", () => {
+    for (const location of ["United Kingdom (Remote)", "Remote - United Kingdom", "York, England"]) {
+      expect(applyHardFilters(job({ remote: true, location }), PROFILE).pass).toBe(false);
+    }
+  });
+
+  test("still accepts a remote posting named for an accepted city", () => {
+    for (const location of ["Remote (San Francisco)", "Remote - New York", "Anywhere in the World"]) {
+      expect(applyHardFilters(job({ remote: true, location }), PROFILE).pass).toBe(true);
+    }
+  });
+
   test("rejects on-site roles when the profile is remote-only", () => {
     const remoteOnly = { ...PROFILE, remoteOnly: true };
     const result = applyHardFilters(job({ remote: false, location: "San Francisco, CA" }), remoteOnly);

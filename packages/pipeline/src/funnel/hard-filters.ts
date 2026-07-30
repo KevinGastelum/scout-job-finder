@@ -112,8 +112,10 @@ function matchesUsInclusiveRegion(words: string[]): boolean {
   return US_INCLUSIVE_REGIONS.has(words.join(" "));
 }
 
+// The whole accepted phrase, not any one of its words: "united states" shares "united" with
+// "United Kingdom" and "new york" shares "york" with "York, England".
 function matchesAcceptedLocation(words: string[], profile: CapabilityProfile): boolean {
-  return words.some((word) => profile.acceptedLocations.some((accepted) => tokenize(accepted).includes(word)));
+  return profile.acceptedLocations.some((accepted) => phraseInWords(accepted, words));
 }
 
 // A single region phrase from a comma/slash-separated list on a remote job.
