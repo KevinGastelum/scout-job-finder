@@ -28,7 +28,7 @@ resource "google_compute_subnetwork" "this" {
   }
 }
 
-# Scout's scan fetches from sixteen job boards on the public internet. Private nodes have no
+# Scout's scan fetches from fifteen job boards on the public internet. Private nodes have no
 # route there on their own, so without this the cluster comes up healthy and every scan fails.
 resource "google_compute_router" "this" {
   project = var.project_id

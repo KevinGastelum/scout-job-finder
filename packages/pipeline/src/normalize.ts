@@ -29,7 +29,6 @@ const SAFE_URL_FALLBACK: Record<SourceId, string> = {
   adzuna: "https://www.adzuna.com",
   workable: "https://apply.workable.com",
   teamtailor: "https://www.teamtailor.com",
-  remoteok: "https://remoteok.com",
   weworkremotely: "https://weworkremotely.com",
 };
 

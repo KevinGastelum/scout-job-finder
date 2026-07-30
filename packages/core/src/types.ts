@@ -13,7 +13,6 @@ export const SOURCE_IDS = [
   "adzuna",
   "workable",
   "teamtailor",
-  "remoteok",
   "weworkremotely",
 ] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];

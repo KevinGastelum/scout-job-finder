@@ -17,7 +17,7 @@ both deterministic filter stages and stops before the only stage that needs the 
 
 | stage | what it does | runs in cluster |
 | --- | --- | --- |
-| fetch | 16 adapters → normalize → identity resolution | yes |
+| fetch | 15 adapters → normalize → identity resolution | yes |
 | hard filters | remote, comp floor, role family, recency | yes |
 | retrieval | fetch full descriptions for survivors | yes |
 | rubric | LLM scores each survivor against the profile | **no** |
@@ -139,7 +139,7 @@ Four things bill, and the shape matters more than the exact rates:
 - the CPU and memory the pods *request* under Autopilot, not what the nodes have — which is
   why `values.yaml` sets requests rather than leaving them to a default;
 - the Cloud NAT gateway, which exists only because private nodes have no other route to the
-  sixteen job boards the scan fetches;
+  fifteen job boards the scan fetches;
 - Artifact Registry storage, which is why the repository has a cleanup policy.
 
 Current rates are at <https://cloud.google.com/kubernetes-engine/pricing>; the figures were
