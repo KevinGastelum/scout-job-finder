@@ -1,6 +1,10 @@
 export interface SkillEntry {
   canonical: string;
   aliases: string[];
+  // Terms that identify the skill only when they are the entire entry in a curated skill list.
+  // Prose matching is word-boundary with no context, so bare "go" fires on "go to market" and
+  // "on the go" — but a profile skill list that says exactly "go" means the language.
+  listAliases?: string[];
   rare: boolean;
 }
 
@@ -44,9 +48,7 @@ export const SKILL_LEXICON: SkillEntry[] = [
   { canonical: "spark", aliases: ["pyspark"], rare: false },
   { canonical: "fastapi", aliases: [], rare: false },
   { canonical: "graphql", aliases: [], rare: false },
-  // Bare "go" is not matchable here: matching is word-boundary with no context, so it
-  // fires on "go to market", "go live", "on the go". Undercounting Go beats inventing it.
-  { canonical: "golang", aliases: ["go lang"], rare: false },
+  { canonical: "golang", aliases: ["go lang"], listAliases: ["go"], rare: false },
   { canonical: "observability", aliases: [], rare: false },
   { canonical: "distributed systems", aliases: [], rare: false },
   { canonical: "ci/cd", aliases: ["cicd", "continuous integration"], rare: false },
@@ -83,11 +85,28 @@ const MATCHERS: { canonical: string; pattern: RegExp }[] = SKILL_LEXICON.flatMap
   })),
 );
 
+const EXACT_TERMS = new Map<string, string>(
+  SKILL_LEXICON.flatMap((entry) =>
+    [entry.canonical, ...entry.aliases, ...(entry.listAliases ?? [])].map(
+      (term) => [term, entry.canonical] as const,
+    ),
+  ),
+);
+
 export function matchSkills(text: string): string[] {
   const lowered = text.toLowerCase();
   const found = new Set<string>();
   for (const matcher of MATCHERS) {
     if (matcher.pattern.test(lowered)) found.add(matcher.canonical);
+  }
+  return [...found].sort();
+}
+
+export function matchSkillList(entries: string[]): string[] {
+  const found = new Set(matchSkills(entries.join("\n")));
+  for (const entry of entries) {
+    const canonical = EXACT_TERMS.get(entry.trim().toLowerCase());
+    if (canonical !== undefined) found.add(canonical);
   }
   return [...found].sort();
 }

@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { matchSkills } from "./lexicon";
+import { matchSkillList, matchSkills } from "./lexicon";
 import type { CapabilityProfile } from "./types";
 
 export type CohortName = "market" | "shortlist";
@@ -259,7 +259,7 @@ export function analyzeMarket(
   const market = buildCohort("market", marketRows(db));
   const shortlist = buildCohort("shortlist", shortlistRows(db));
 
-  const have = matchSkills(profile.skills.join("\n"));
+  const have = matchSkillList(profile.skills);
   const haveSet = new Set(have);
   const marketCompanies = new Map(market.skills.map((entry) => [entry.skill, entry.companies]));
 

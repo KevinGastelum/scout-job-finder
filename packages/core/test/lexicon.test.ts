@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { RARE_SKILLS, SKILL_LEXICON, matchSkills } from "../src/lexicon";
+import { RARE_SKILLS, SKILL_LEXICON, matchSkillList, matchSkills } from "../src/lexicon";
 
 describe("matchSkills", () => {
   test("matches canonical names and aliases case-insensitively", () => {
@@ -23,6 +23,25 @@ describe("matchSkills", () => {
   test("returns sorted unique canonical names", () => {
     const found = matchSkills("Python python PYTHON typescript");
     expect(found).toEqual(["python", "typescript"]);
+  });
+});
+
+describe("matchSkillList", () => {
+  test("resolves terms that are too ambiguous to match in prose", () => {
+    expect(matchSkills("go")).not.toContain("golang");
+    expect(matchSkillList(["go"])).toContain("golang");
+  });
+
+  test("still matches everything prose matching would", () => {
+    expect(matchSkillList(["aws lambda", "React Native"])).toEqual(["aws", "react"]);
+  });
+
+  test("only honours an ambiguous term when it is the whole entry", () => {
+    expect(matchSkillList(["go to market", "on the go"])).not.toContain("golang");
+  });
+
+  test("ignores surrounding whitespace and case", () => {
+    expect(matchSkillList(["  Go  "])).toContain("golang");
   });
 });
 
