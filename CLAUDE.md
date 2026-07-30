@@ -25,5 +25,6 @@ Local-first agentic job-finder. Bun workspaces monorepo.
 - `bun test`
 - `bun run typecheck`
 - `bun run profile` — compile profile/profile.md to profile/profile.json
+- `bun run ingest` — ingest GitHub repos (+ optional profile/resume.md) into profile/generated.json, then recompile the profile
 - `bun run scan` — run a full pipeline scan
 - `bun run web:build` && `bun run serve` — build and serve the dashboard

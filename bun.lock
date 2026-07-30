@@ -27,6 +27,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@scout/core": "workspace:*",
+        "zod": "^4.4.3",
       },
     },
     "packages/server": {

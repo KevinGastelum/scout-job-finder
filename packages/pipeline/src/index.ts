@@ -141,3 +141,13 @@ export {
   type FunnelSummary,
   type RetrievalCandidate,
 } from "./funnel";
+export { GITHUB_API, MAX_REPOS, fetchGithubRepos, type GithubRepo } from "./ingest/github";
+export {
+  EXTRACT_BATCH_SIZE,
+  PROFILE_EXTRACT_PROMPT_VERSION,
+  buildExtractionPrompt,
+  extractProfileInventory,
+  type ProfileDocument,
+  type ProfileInventory,
+} from "./ingest/extract";
+export { RESUME_PATH, loadResumeDocument } from "./ingest/resume";

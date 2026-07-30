@@ -33,6 +33,7 @@ interactive Claude sessions, so extraction and scoring are batched, budgeted and
 bun install
 cp profile/profile.template.md profile/profile.md   # then edit it
 bun run profile
+bun run ingest      # ingest GitHub repos (+ optional profile/resume.md) into profile/generated.json, then recompile the profile
 ```
 
 `profile/` is gitignored except the template — it holds personal data.
