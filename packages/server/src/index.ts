@@ -47,6 +47,7 @@ const rubricBudget = parseRubricBudget(envValue("SCOUT_RUBRIC_BUDGET"));
 const handleApi = createApp({
   db,
   rubricVersion: RUBRIC_VERSION,
+  currentProfileVersion: async () => (await loadProfile())?.version,
   trustedHosts,
   startScan: async () => {
     const summary = await runScan({

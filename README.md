@@ -67,11 +67,15 @@ bun run serve       # http://localhost:8787
 Other commands:
 
 ```bash
+bun run score           # re-run the funnel over the stored jobs; 0 network
 bun run intel           # rank skill demand across collected postings; 0 network, 0 LLM
 bun test
 bun run typecheck
 bun run verify-boards   # probe the Greenhouse/Lever/Ashby seed tokens
 ```
+
+`score` exists because the rubric cache keys on the profile version: editing `profile/profile.md`
+invalidates every stored score, and re-scoring shouldn't require re-fetching fifteen sources.
 
 Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MODEL` (model for
 `claude -p`, default `claude-sonnet-5`), `SCOUT_PORT` (server port, default `8787`),

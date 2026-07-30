@@ -128,6 +128,31 @@ describe("shortlist read model", () => {
     db.close();
   });
 
+  // A profile edit invalidates the rubric cache but leaves the old rows behind, so the table
+  // accumulates one score per profile the database has seen. Without this filter the top of the
+  // shortlist can be a job judged against target roles the profile no longer lists.
+  test("ranks only against the requested profile version", async () => {
+    const { db, ids } = await seed([
+      ["stale-winner", 95],
+      ["current", 60],
+    ]);
+    db.run("UPDATE scores SET profile_version = 'profile-old' WHERE job_id = ?", [
+      ids["stale-winner"] ?? 0,
+    ]);
+
+    expect(
+      listShortlist(db, RUBRIC_VERSION, { profileVersion: "profile-test" }).map(
+        (entry) => entry.job.sourceNativeId,
+      ),
+    ).toEqual(["current"]);
+
+    expect(listShortlist(db, RUBRIC_VERSION).map((entry) => entry.job.sourceNativeId)).toEqual([
+      "stale-winner",
+      "current",
+    ]);
+    db.close();
+  });
+
   test("omits expired jobs", async () => {
     const { db, ids } = await seed([["gone", 88]]);
     db.run("UPDATE jobs SET status = 'expired' WHERE id = ?", [ids.gone ?? 0]);

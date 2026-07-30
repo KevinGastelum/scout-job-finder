@@ -11,6 +11,9 @@ import {
 export interface AppDeps {
   db: Database;
   rubricVersion: string;
+  // Resolved per request, not at startup: a scan can recompile the profile while the server is
+  // up, and a shortlist ranked against a version that is no longer current is worse than none.
+  currentProfileVersion?: () => Promise<string | undefined>;
   startScan: () => Promise<{ runId: number }>;
   // Hostnames to accept besides loopback. Only for running behind a proxy that authenticates
   // before forwarding — this server still has no auth of its own.
@@ -100,6 +103,7 @@ export function createApp(deps: AppDeps): AppHandler {
       const limitParam = url.searchParams.get("limit");
       const limit = limitParam === null ? Number.NaN : Number(limitParam);
       const entries = listShortlist(deps.db, deps.rubricVersion, {
+        profileVersion: await deps.currentProfileVersion?.(),
         // SQLite's LIMIT rejects a value it cannot losslessly bind as an integer, so
         // Number.isSafeInteger matters here, not just Number.isInteger (true for 1e100).
         limit:
