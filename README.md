@@ -26,7 +26,14 @@ interactive Claude sessions, so extraction and scoring are batched, budgeted and
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` | Per-token, curated seed list |
 | Lever | `api.lever.co/v0/postings/{token}` | Per-token, curated seed list |
 | Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Per-slug, curated seed list; whole board in one unpaginated response |
+| The Muse | `themuse.com/api/public/jobs` | Keyless, paginated; broad industry mix, so most items fall out at the title filter |
+| Arbeitnow | `arbeitnow.com/api/job-board-api` | Keyless, single page; `created_at` is Unix epoch seconds, descriptions inconsistently entity-encoded |
+| Himalayas | `himalayas.app/jobs/api` | Keyless, remote-only; caps a response at 20 however large a `limit` is sent, so paging strides by the served count |
+| Jobicy | `jobicy.com/api/v2/remote-jobs` | Keyless, remote-only; flat `salaryMin`/`salaryMax` fields |
 | HN Who's Hiring | `hn.algolia.com/api/v1` | Free-form comments, LLM-extracted and cached |
+
+The four aggregators need no per-company curation, unlike the Greenhouse/Lever/Ashby seed lists —
+they are what widens company coverage without more slug maintenance.
 
 ## Setup
 
@@ -70,7 +77,7 @@ Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MO
 
 ## Scope
 
-This is P1: five sources, identity resolution, the scoring funnel, and a minimal Today view.
+This is P1: nine sources, identity resolution, the scoring funnel, and a minimal Today view.
 Market intel, the full dashboard, the tailoring engine and the automation ladder are later
 phases — see `docs/superpowers/specs/2026-07-28-agentic-job-finder-design.md`.
 

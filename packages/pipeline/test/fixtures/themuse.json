@@ -1,0 +1,55 @@
+{
+  "page": 1,
+  "page_count": 1,
+  "items_per_page": 20,
+  "took": 12,
+  "timed_out": false,
+  "total": 3,
+  "aggregations": {},
+  "results": [
+    {
+      "contents": "<p>Own our <strong>product marketing</strong> motion.</p><p>Second paragraph.</p>",
+      "name": "Product Marketing Manager",
+      "type": "external",
+      "publication_date": "2026-07-20T10:00:00Z",
+      "short_name": "product-marketing-manager-111",
+      "model_type": "jobs",
+      "id": 111,
+      "locations": [{ "name": "New York, NY" }],
+      "categories": [],
+      "levels": [{ "name": "Mid Level", "short_name": "midlevel" }],
+      "tags": [],
+      "refs": { "landing_page": "https://www.themuse.com/jobs/acme/product-marketing-manager-111" },
+      "company": { "id": 1001, "short_name": "acme", "name": "Acme Corp" }
+    },
+    {
+      "contents": "<p>Help customers around the clock.</p>",
+      "name": "Remote Support Engineer",
+      "type": "external",
+      "publication_date": "2026-07-18T09:30:00Z",
+      "short_name": "remote-support-engineer-222",
+      "model_type": "jobs",
+      "id": 222,
+      "locations": [{ "name": "Remote" }],
+      "categories": [],
+      "levels": [{ "name": "Senior Level", "short_name": "senior" }],
+      "tags": [],
+      "refs": {},
+      "company": { "id": 1002, "short_name": "widgetco", "name": "Widget Co" }
+    },
+    {
+      "contents": "<p>We never got around to filling in an id for this one.</p>",
+      "name": "Unidentified Role",
+      "type": "external",
+      "publication_date": "2026-07-15T08:00:00Z",
+      "short_name": "unidentified-role-333",
+      "model_type": "jobs",
+      "locations": [],
+      "categories": [],
+      "levels": [],
+      "tags": [],
+      "refs": {},
+      "company": { "id": 1003, "short_name": "mystery", "name": "Mystery Inc" }
+    }
+  ]
+}

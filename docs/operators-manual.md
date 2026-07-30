@@ -51,6 +51,6 @@ Practical runbook for the single human operator (Kevin).
 | Command | What it does | Network / LLM cost |
 | --- | --- | --- |
 | `just ingest` (`bun run ingest`) | Extracts GitHub repos (private too, with a token), local git checkouts, and `profile/resume.md` into `profile/generated.json`, then recompiles `profile/profile.json` | GitHub: 1 listing call + 2 per uncached repo (≤41 unauthenticated, ≤243 authenticated). Local repo scan is filesystem-only. Plus one `claude` call per changed document — unchanged documents are served from cache |
-| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, and HN, deduplicates, and scores candidates | Source job APIs + up to 25 `claude` LLM rubric calls |
+| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, The Muse, Arbeitnow, Himalayas, Jobicy, and HN, deduplicates, and scores candidates | Source job APIs + up to 25 `claude` LLM rubric calls |
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |

@@ -20,6 +20,10 @@ const SAFE_URL_FALLBACK: Record<SourceId, string> = {
   lever: "https://www.lever.co",
   ashby: "https://www.ashbyhq.com",
   hn: "https://news.ycombinator.com",
+  themuse: "https://www.themuse.com",
+  arbeitnow: "https://www.arbeitnow.com",
+  himalayas: "https://himalayas.app",
+  jobicy: "https://jobicy.com",
 };
 
 function squash(value: string): string {

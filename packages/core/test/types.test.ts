@@ -9,7 +9,17 @@ import {
 
 describe("domain constants", () => {
   test("exposes every ingest source", () => {
-    expect([...SOURCE_IDS]).toEqual(["remotive", "greenhouse", "lever", "ashby", "hn"]);
+    expect([...SOURCE_IDS]).toEqual([
+      "remotive",
+      "greenhouse",
+      "lever",
+      "ashby",
+      "hn",
+      "themuse",
+      "arbeitnow",
+      "himalayas",
+      "jobicy",
+    ]);
   });
 
   test("seniority ladder is ordered low to high", () => {
