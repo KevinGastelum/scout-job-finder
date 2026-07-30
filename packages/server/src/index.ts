@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defaultDbPath, envOr, loadProfile, openDb } from "@scout/core";
+import { defaultDbPath, envOr, envValue, loadProfile, openDb } from "@scout/core";
 import {
   ClaudeCliClient,
   AdzunaAdapter,
@@ -12,6 +12,7 @@ import {
   LeverAdapter,
   LinkedInAdapter,
   RUBRIC_VERSION,
+  parseRubricBudget,
   RemoteOkAdapter,
   RemotiveAdapter,
   TeamtailorAdapter,
@@ -39,6 +40,10 @@ const trustedHosts = envOr("SCOUT_TRUSTED_HOSTS", "")
   .map((host) => host.trim())
   .filter((host) => host.length > 0);
 
+// Same setting the CronJob honours, read here so the dashboard's scan button and the
+// scheduled scan cannot disagree about whether this environment can reach the claude CLI.
+const rubricBudget = parseRubricBudget(envValue("SCOUT_RUBRIC_BUDGET"));
+
 const handleApi = createApp({
   db,
   rubricVersion: RUBRIC_VERSION,
@@ -46,6 +51,7 @@ const handleApi = createApp({
   startScan: async () => {
     const summary = await runScan({
       db,
+      rubricBudget,
       adapters: [
         new RemotiveAdapter(),
         new GreenhouseAdapter(),

@@ -1,0 +1,151 @@
+name: infra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "deploy/**"
+      - ".github/workflows/infra.yml"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "deploy/**"
+      - ".github/workflows/infra.yml"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "bun.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - run: terraform fmt -check -recursive -diff
+
+      # No backend and no credentials: this proves the configuration parses and type-checks,
+      # which is the whole of what can be proved without touching a real project.
+      - run: terraform init -backend=false -input=false
+
+      - run: terraform validate
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          # Matches the version the chart was verified against locally.
+          version: v4.2.3
+
+      - run: helm lint deploy/helm/scout
+
+      # Rendering with defaults only proves the happy path. The permutations below are the
+      # ones with conditional blocks, and each has broken independently while being written.
+      - name: Render every supported combination
+        run: |
+          set -euo pipefail
+          helm template scout deploy/helm/scout > /dev/null
+          helm template scout deploy/helm/scout \
+            --set persistence.enabled=false --set scan.enabled=false > /dev/null
+          helm template scout deploy/helm/scout \
+            --set profile.existingSecret=p --set existingSecret=s > /dev/null
+          helm template scout deploy/helm/scout \
+            --set ingress.enabled=true --set ingress.host=scout.example \
+            --set 'networkPolicy.ingressFrom[0].namespaceSelector.matchLabels.kubernetes\.io/metadata\.name=ingress-system' > /dev/null
+
+      # An ingress with no host, or with the NetworkPolicy left closed behind it, renders a
+      # release that returns 403 to every request. Both must fail loudly rather than deploy.
+      - name: Reject the misconfigurations that would deploy a dead release
+        run: |
+          set -euo pipefail
+          ! helm template scout deploy/helm/scout --set ingress.enabled=true \
+            --set networkPolicy.enabled=false 2>/dev/null
+          ! helm template scout deploy/helm/scout --set ingress.enabled=true \
+            --set ingress.host=scout.example 2>/dev/null
+
+      # helm lint only proves the output is YAML. This proves it is Kubernetes.
+      - name: Validate rendered manifests against the Kubernetes API schema
+        env:
+          KUBECONFORM_VERSION: v0.6.7
+        run: |
+          set -euo pipefail
+          base="https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}"
+          curl -sSLo kubeconform.tar.gz "${base}/kubeconform-linux-amd64.tar.gz"
+          curl -sSLo CHECKSUMS "${base}/CHECKSUMS"
+          grep " kubeconform-linux-amd64.tar.gz\$" CHECKSUMS \
+            | sed 's/kubeconform-linux-amd64.tar.gz/kubeconform.tar.gz/' \
+            | sha256sum -c -
+          tar xzf kubeconform.tar.gz kubeconform
+          helm template scout deploy/helm/scout --set profile.existingSecret=p \
+            | ./kubeconform -strict -summary -kubernetes-version 1.30.0
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run typecheck
+
+      - run: bun test
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build only. Publishing is a separate, credentialed workflow: this one runs on pull
+      # requests from forks, and nothing that runs there should be able to push an image.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: scout:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A container that cannot answer its own health check is a container that will fail its
+      # probes in the cluster, and that is cheaper to learn here than during a rollout.
+      - name: Start the image and check it serves
+        run: |
+          set -euo pipefail
+          docker run -d --name scout -p 8787:8787 -e SCOUT_DB=/tmp/ci.db scout:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/api/health | grep -q '"ok"'; then
+              echo "healthy after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "never became healthy"; docker logs scout; exit 1
+
+      - if: always()
+        run: docker rm -f scout || true

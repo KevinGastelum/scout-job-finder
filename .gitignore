@@ -9,3 +9,12 @@ dist/
 profile/*
 !profile/profile.template.md
 .tmp/
+
+# Terraform state names the project and every resource in it; tfvars names the project too.
+# .terraform.lock.hcl is deliberately not here — CI has to resolve the same provider hashes.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

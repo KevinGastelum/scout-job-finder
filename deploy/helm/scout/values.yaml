@@ -1,0 +1,113 @@
+image:
+  repository: ghcr.io/kevingastelum/scout
+  # Empty falls back to .Chart.AppVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  # Workload Identity binding lives here, e.g.
+  # iam.gke.io/gcp-service-account: scout@PROJECT.iam.gserviceaccount.com
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 8787
+
+# The server reads the same SQLite file the scan writes, so one volume backs both.
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  size: 8Gi
+  # ReadWriteOnce is not a limitation to work around here: SQLite tolerates one writer
+  # and many readers on a local filesystem and nothing at all across a network one.
+  accessMode: ReadWriteOnce
+
+# profile/profile.json is the candidate's personal data and is deliberately absent from the
+# image. Without it the scan still fetches and stores postings and skips the scoring funnel.
+# Create the Secret out of band:
+#   kubectl create secret generic scout-profile --from-file=profile.json=profile/profile.json
+profile:
+  existingSecret: ""
+
+# Job-source API keys (ADZUNA_APP_ID, ADZUNA_API_KEY, USA_JOBS_API_KEY, USA_JOBS_EMAIL).
+# Referenced, never templated — no credential belongs in a values file.
+existingSecret: ""
+
+# Extra plain environment for both the server and the scan.
+env: {}
+
+scan:
+  enabled: true
+  schedule: "0 13 * * *"
+  timeZone: Etc/UTC
+  # The rubric stage is the only one that shells out to the operator's authenticated
+  # `claude` CLI, and no pod has that session. Zero runs the fetch and both deterministic
+  # filter stages and stops there; scoring stays on the operator's machine.
+  rubricBudget: 0
+  # A hung upstream should not hold the volume until the next schedule fires.
+  activeDeadlineSeconds: 3600
+  backoffLimit: 1
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  # oven/bun creates `bun` as 1000:1000; fsGroup is what makes the mounted volume writable
+  # by it, since the image's chown of /data is shadowed by the mount.
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Off by default, and it should stay off unless something authenticates in front of it:
+# this server has no auth and /api/shortlist returns personal job-search data.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: ""
+  tls: []
+
+# Hostnames the server accepts besides loopback. ingress.host is added automatically.
+trustedHosts: []
+
+# Defence in depth for the same reason the ingress is off: nothing in the cluster should
+# reach this port unless it is named here.
+networkPolicy:
+  enabled: true
+  # Extra peers, each a NetworkPolicyPeer (podSelector / namespaceSelector / ipBlock).
+  ingressFrom: []
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

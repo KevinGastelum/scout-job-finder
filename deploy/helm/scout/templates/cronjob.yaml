@@ -1,0 +1,84 @@
+{{- if .Values.scan.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "scout.fullname" . }}-scan
+  labels:
+    {{- include "scout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scan
+spec:
+  schedule: {{ .Values.scan.schedule | quote }}
+  timeZone: {{ .Values.scan.timeZone | quote }}
+  # Two scans writing one SQLite file is the one thing this deployment must never do.
+  concurrencyPolicy: Forbid
+  # A node that was down over a schedule should skip that run, not fire it late.
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: {{ .Values.scan.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.scan.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.scan.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.scan.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "scout.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: scan
+            {{- with .Values.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        spec:
+          # Never rather than OnFailure so a failed scan leaves its pod and logs behind.
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "scout.serviceAccountName" . }}
+          automountServiceAccountToken: false
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: scan
+              image: {{ include "scout.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              command: ["bun", "run", "scripts/scan.ts"]
+              envFrom:
+                {{- include "scout.envFrom" . | nindent 16 }}
+              resources:
+                {{- toYaml .Values.scan.resources | nindent 16 }}
+              volumeMounts:
+                {{- include "scout.volumeMounts" . | nindent 16 }}
+          volumes:
+            {{- include "scout.volumes" . | nindent 12 }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.affinity }}
+          affinity:
+            {{- toYaml .Values.affinity | nindent 12 }}
+          {{- else if and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteOnce") }}
+          # A ReadWriteOnce volume can be mounted by two pods only when they share a node, so
+          # the scan has to land wherever the server already is. If the server is mid-restart
+          # this run does not schedule and the next one picks it up.
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      {{- include "scout.selectorLabels" . | nindent 22 }}
+                      app.kubernetes.io/component: server
+          {{- end }}
+{{- end }}

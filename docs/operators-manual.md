@@ -98,3 +98,25 @@ Two aggregators ask for credit in their terms, and both asks are about *republis
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
 | `bun run scripts/discover-board.ts [Name=domain ...]` | Finds the applicant tracking system behind a company's careers page: fingerprints the HTML, falls back to its JS bundles, reports any embedded posting JSON, then probes every keyless board API for the likely tokens. With no arguments it runs the `verified: false` seed rows | Careers page + up to 12 bundles + one probe per provider/token pair, paced at 300ms. 0 LLM |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |
+
+## Running a scan without the Claude CLI
+
+`SCOUT_RUBRIC_BUDGET=0` fetches every source and applies both deterministic filter stages,
+then stops before the rubric stage — the only one that shells out to `claude`. Nothing is
+scored, and nothing is lost: the postings are stored, and the next scan on a machine with an
+authenticated CLI scores whatever survived the filters.
+
+```bash
+SCOUT_RUBRIC_BUDGET=0 bun run scan
+```
+
+Use it when the CLI is unauthenticated, when quota is tight and you want collection to keep
+running, or somewhere the CLI does not exist at all — the Kubernetes CronJob in
+[`deploy/`](../deploy/README.md) is exactly that case. The setting is rejected rather than
+coerced if it is not a whole non-negative number, so a typo cannot report a healthy scan that
+quietly scored nothing.
+
+Two related variables matter only when something other than your own browser reaches the
+server: `SCOUT_HOST` changes the bind address away from loopback, and `SCOUT_TRUSTED_HOSTS`
+lists hostnames accepted besides loopback. The server has no authentication, so change
+neither unless something in front of it does.

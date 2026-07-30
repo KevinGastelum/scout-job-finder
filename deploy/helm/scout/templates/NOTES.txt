@@ -1,0 +1,40 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} is installed as {{ .Release.Name }} in {{ .Release.Namespace }}.
+
+Reach the dashboard:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "scout.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  open http://localhost:{{ .Values.service.port }}
+
+{{ if not .Values.ingress.enabled -}}
+There is no ingress, on purpose. This server has no authentication and /api/shortlist returns
+personal job-search data, so port-forward is the intended way in.
+{{- else -}}
+An ingress is enabled at https://{{ .Values.ingress.host }}. This server has no authentication
+of its own — whatever fronts that host must authenticate before forwarding.
+{{- end }}
+
+{{ if .Values.scan.enabled -}}
+The scan runs on {{ .Values.scan.schedule }} ({{ .Values.scan.timeZone }}) with
+SCOUT_RUBRIC_BUDGET={{ .Values.scan.rubricBudget }}.
+{{ if eq (int .Values.scan.rubricBudget) 0 -}}
+At 0 it fetches every source and applies both deterministic filter stages, then stops. The
+rubric stage shells out to your authenticated `claude` CLI, which no pod has. Score what the
+cluster collected by running `bun run scan` against the same database on your own machine.
+{{- else -}}
+A budget above 0 needs a `claude` CLI in the image, authenticated as you. The published image
+carries none, so this scan will report rubric errors until you supply one.
+{{- end }}
+
+  kubectl -n {{ .Release.Namespace }} create job --from=cronjob/{{ include "scout.fullname" . }}-scan scan-now
+{{- else -}}
+The scheduled scan is disabled; the server serves whatever is already in the database.
+{{- end }}
+
+{{ if not .Values.profile.existingSecret }}
+No profile secret is set, so the scan stores postings and skips scoring entirely. To score,
+create one from your compiled profile:
+
+  kubectl -n {{ .Release.Namespace }} create secret generic scout-profile \
+    --from-file=profile.json=profile/profile.json
+  helm upgrade {{ .Release.Name }} ... --set profile.existingSecret=scout-profile
+{{- end }}

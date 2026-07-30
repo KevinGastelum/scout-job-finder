@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+project_id        = "scout-123456"
+github_repository = "kevingastelum/scout"
+
+# region = "us-central1"
+# name   = "scout"
+# cluster_deletion_protection = false

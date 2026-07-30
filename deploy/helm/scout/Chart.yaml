@@ -1,0 +1,13 @@
+apiVersion: v2
+name: scout
+description: Scout's read tier (HTTP API + dashboard) and its scheduled source scan
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+# CronJob .spec.timeZone reached GA in 1.27; PVC and probe fields used here are older.
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/kevingastelum/scout
+keywords:
+  - job-search
+  - bun
+  - sqlite

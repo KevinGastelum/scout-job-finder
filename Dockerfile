@@ -14,6 +14,11 @@ COPY tsconfig.json ./
 COPY packages/ packages/
 RUN bun run web:build
 
+# The runtime serves a pre-built bundle and never compiles anything, so vite and typescript
+# have no business in the shipped image.
+FROM deps AS prod-deps
+RUN rm -rf node_modules && bun install --frozen-lockfile --production
+
 FROM oven/bun:1.3-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS runtime
 WORKDIR /app
 
@@ -27,7 +32,7 @@ ENV NODE_ENV=production \
     SCOUT_DB=/data/scout.db \
     SCOUT_RUBRIC_BUDGET=0
 
-COPY --from=deps /app/node_modules node_modules/
+COPY --from=prod-deps /app/node_modules node_modules/
 COPY --from=build /app/packages/web/dist packages/web/dist/
 COPY package.json tsconfig.json ./
 COPY packages/core packages/core/

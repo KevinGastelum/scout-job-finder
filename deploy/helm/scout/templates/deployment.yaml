@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "scout.fullname" . }}
+  labels:
+    {{- include "scout.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  # Not a value, and not one replica out of timidity: the store is a single SQLite file on a
+  # ReadWriteOnce volume. A second replica either lands on another node and blocks forever on
+  # the volume, or lands on the same one and contends for the write lock.
+  replicas: 1
+  strategy:
+    # RollingUpdate would stand the replacement up before releasing the volume, which is the
+    # same deadlock by a different route.
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "scout.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      annotations:
+        # Restarts the server when SCOUT_TRUSTED_HOSTS or the budget changes; a ConfigMap
+        # edit alone would leave the running process on the old values.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "scout.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "scout.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: server
+          image: {{ include "scout.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          envFrom:
+            {{- include "scout.envFrom" . | nindent 12 }}
+          # Every probe arrives with the pod IP in the Host header, which the rebinding guard
+          # rejects. /api/health is answered ahead of that guard for exactly this reason.
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 2
+            # Opening a database this size and replaying a WAL is not instant on a cold volume.
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "scout.volumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "scout.volumes" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

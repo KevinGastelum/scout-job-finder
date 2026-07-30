@@ -1,0 +1,30 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- if and .Values.ingress.enabled (not .Values.networkPolicy.ingressFrom) }}
+{{- fail "ingress.enabled with networkPolicy.enabled needs networkPolicy.ingressFrom to name the controller's pods or namespace — guessing at it would either break the route or open the port wider than intended" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "scout.fullname" . }}
+  labels:
+    {{- include "scout.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "scout.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+  {{- with .Values.networkPolicy.ingressFrom }}
+  ingress:
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.service.port }}
+  {{- else }}
+  # Default deny. Nothing in the cluster needs this port: the dashboard is read over
+  # `kubectl port-forward`, and probes come from the kubelet, which is not a pod.
+  ingress: []
+  {{- end }}
+{{- end }}

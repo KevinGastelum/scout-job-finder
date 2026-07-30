@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "scout.fullname" . }}
+  labels:
+    {{- include "scout.labels" . | nindent 4 }}
+data:
+  # 0.0.0.0 rather than loopback because a pod is only reachable on its pod IP. What keeps
+  # that safe is the ClusterIP service, the NetworkPolicy, and the host guard below.
+  SCOUT_HOST: "0.0.0.0"
+  SCOUT_PORT: {{ .Values.service.port | quote }}
+  SCOUT_DB: /data/scout.db
+  # The root filesystem is read-only, so anything that reaches for a home or scratch directory
+  # has to find one that is not. Both point at the emptyDir.
+  HOME: /tmp
+  TMPDIR: /tmp
+  SCOUT_RUBRIC_BUDGET: {{ .Values.scan.rubricBudget | quote }}
+  {{- $trusted := .Values.trustedHosts }}
+  {{- if and .Values.ingress.enabled .Values.ingress.host }}
+  {{- $trusted = append $trusted .Values.ingress.host }}
+  {{- end }}
+  # An ingress host arrives in the Host header and would otherwise be rejected as a
+  # rebinding attempt, so enabling the ingress has to widen the allowlist with it.
+  SCOUT_TRUSTED_HOSTS: {{ join "," $trusted | quote }}
+  {{- if .Values.profile.existingSecret }}
+  SCOUT_PROFILE: /profile/profile.json
+  {{- end }}
+  {{- range $key, $value := .Values.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
