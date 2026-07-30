@@ -12,6 +12,9 @@ export interface AppDeps {
   db: Database;
   rubricVersion: string;
   startScan: () => Promise<{ runId: number }>;
+  // Hostnames to accept besides loopback. Only for running behind a proxy that authenticates
+  // before forwarding — this server still has no auth of its own.
+  trustedHosts?: string[];
   now?: () => Date;
 }
 
@@ -41,7 +44,7 @@ function isApplicationStatus(value: unknown): value is ApplicationStatus {
 // Bun.serve derives request.url from the Host header, so the URL is the authority. Parsing the
 // raw header instead would be strictly worse: `localhost:8787@evil.example` is userinfo plus a
 // host of evil.example to a URL parser, but everything-before-the-first-colon to a string split.
-function hostAllowed(request: Request): boolean {
+function hostAllowed(request: Request, trusted: ReadonlySet<string>): boolean {
   let hostname: string;
   try {
     hostname = new URL(request.url).hostname.toLowerCase();
@@ -49,6 +52,7 @@ function hostAllowed(request: Request): boolean {
     return false;
   }
   if (hostname === "localhost" || hostname === "[::1]") return true;
+  if (trusted.has(hostname.toLowerCase())) return true;
   return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
 }
 
@@ -64,13 +68,26 @@ function originAllowed(request: Request): boolean {
 
 export function createApp(deps: AppDeps): AppHandler {
   const now = deps.now ?? (() => new Date());
+  const trustedHosts = new Set((deps.trustedHosts ?? []).map((host) => host.trim().toLowerCase()));
   let scanning = false;
 
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    if (!hostAllowed(request)) {
+    // Ahead of the host guard: a kubelet probes by pod IP, which is never a host the guard
+    // trusts. Safe to answer there because it discloses nothing but liveness.
+    if (path === "/api/health") {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
+      try {
+        deps.db.query("select 1").get();
+      } catch {
+        return json({ status: "unavailable" }, 503);
+      }
+      return json({ status: "ok" });
+    }
+
+    if (!hostAllowed(request, trustedHosts)) {
       return json({ error: "host not allowed" }, 403);
     }
 

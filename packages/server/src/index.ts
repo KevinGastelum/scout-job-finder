@@ -30,9 +30,19 @@ const db = await openDb(defaultDbPath());
 const port = Number(envOr("SCOUT_PORT", "8787"));
 const distDir = fileURLToPath(new URL("../../web/dist/", import.meta.url));
 
+// Loopback by default because this server has no auth and serves personal job-search data.
+// A container has to bind the pod IP to be reachable at all, which is safe only because the
+// deployment keeps it on a ClusterIP with no public route.
+const hostname = envOr("SCOUT_HOST", "127.0.0.1");
+const trustedHosts = envOr("SCOUT_TRUSTED_HOSTS", "")
+  .split(",")
+  .map((host) => host.trim())
+  .filter((host) => host.length > 0);
+
 const handleApi = createApp({
   db,
   rubricVersion: RUBRIC_VERSION,
+  trustedHosts,
   startScan: async () => {
     const summary = await runScan({
       db,
@@ -64,7 +74,7 @@ const handleApi = createApp({
 
 Bun.serve({
   port,
-  hostname: "127.0.0.1",
+  hostname,
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) return handleApi(request);

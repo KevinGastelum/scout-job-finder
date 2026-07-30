@@ -1,0 +1,23 @@
+# The database is the operator's personal job-search data and runs to hundreds of megabytes.
+# The chart mounts it at /data instead; it must never be baked into a pushed image.
+*.db
+*.db-shm
+*.db-wal
+
+# profile/ is the candidate's personal data and is gitignored for the same reason.
+profile/
+
+.env
+.env.*
+!.env.example
+
+.git/
+.github/
+.tmp/
+node_modules/
+**/node_modules/
+packages/web/dist/
+docs/
+deploy/
+*.md
+!README.md

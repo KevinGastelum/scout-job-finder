@@ -89,8 +89,14 @@ async function seed(): Promise<{ db: Database; jobId: number }> {
   return { db, jobId };
 }
 
-function appFor(db: Database, startScan = async () => ({ runId: 7 })) {
-  return createApp({ db, rubricVersion: RUBRIC_VERSION, startScan, now: () => new Date("2026-07-28T12:00:00.000Z") });
+function appFor(db: Database, startScan = async () => ({ runId: 7 }), trustedHosts?: string[]) {
+  return createApp({
+    db,
+    rubricVersion: RUBRIC_VERSION,
+    startScan,
+    trustedHosts,
+    now: () => new Date("2026-07-28T12:00:00.000Z"),
+  });
 }
 
 describe("server app", () => {
@@ -262,6 +268,46 @@ describe("server app", () => {
   });
 });
 
+describe("health", () => {
+  test("reports ok and nothing else", async () => {
+    const { db } = await seed();
+    const response = await appFor(db)(new Request("http://localhost:8787/api/health"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "ok" });
+    db.close();
+  });
+
+  // A kubelet probes the pod by IP, so the health check arrives with a host the guard would
+  // otherwise reject. It answers before the guard because it discloses nothing.
+  test("answers a probe arriving on an untrusted host", async () => {
+    const { db } = await seed();
+    const response = await appFor(db)(new Request("http://10.4.1.7:8787/api/health"));
+
+    expect(response.status).toBe(200);
+    db.close();
+  });
+
+  test("fails once the database is gone", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+    db.close();
+
+    const response = await app(new Request("http://localhost:8787/api/health"));
+    expect(response.status).toBe(503);
+  });
+
+  test("is read-only", async () => {
+    const { db } = await seed();
+    const response = await appFor(db)(
+      new Request("http://localhost:8787/api/health", { method: "POST" }),
+    );
+
+    expect(response.status).toBe(405);
+    db.close();
+  });
+});
+
 describe("host guard", () => {
   // Bun.serve derives request.url from the Host header, so a non-loopback URL here is exactly
   // what a DNS-rebinding victim's browser produces.
@@ -284,6 +330,46 @@ describe("host guard", () => {
     const { db } = await seed();
     const response = await appFor(db)(new Request("http://evil.example/api/shortlist"));
     expect(response.status).toBe(403);
+    db.close();
+  });
+
+  // Behind an authenticating proxy the Host is the proxy's name, never loopback. Allowing an
+  // explicitly configured name is not a rebinding hole: an attacker's page still arrives with
+  // its own host, and reaching the pod under the trusted name means passing the proxy first.
+  test("accepts a host the operator explicitly trusted", async () => {
+    const { db } = await seed();
+    const app = appFor(db, undefined, ["scout.internal.example"]);
+
+    const response = await app(new Request("http://scout.internal.example/api/shortlist"));
+    expect(response.status).toBe(200);
+    db.close();
+  });
+
+  test("still rejects every host that was not configured", async () => {
+    const { db } = await seed();
+    const app = appFor(db, undefined, ["scout.internal.example"]);
+
+    const response = await app(new Request("http://evil.example/api/shortlist"));
+    expect(response.status).toBe(403);
+    db.close();
+  });
+
+  test("keeps loopback working when a trusted host is configured", async () => {
+    const { db } = await seed();
+    const app = appFor(db, undefined, ["scout.internal.example"]);
+
+    const response = await app(new Request("http://localhost:8787/api/shortlist"));
+    expect(response.status).toBe(200);
+    db.close();
+  });
+
+  // The port belongs to the proxy, not to the operator's allowlist entry.
+  test("matches a trusted host irrespective of the port", async () => {
+    const { db } = await seed();
+    const app = appFor(db, undefined, ["scout.internal.example"]);
+
+    const response = await app(new Request("http://scout.internal.example:8080/api/shortlist"));
+    expect(response.status).toBe(200);
     db.close();
   });
 
