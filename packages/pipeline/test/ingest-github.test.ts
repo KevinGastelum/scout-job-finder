@@ -260,6 +260,44 @@ describe("fetchGithubRepos", () => {
     expect(repos).toEqual([]);
     expect(await Bun.file(join(cacheDir, "kev--empty-repo.json")).exists()).toBe(false);
   });
+
+  test("treats a whitespace-only readme as absent, so an otherwise-empty repo is not cached", async () => {
+    const cacheDir = tempCacheDir();
+    const blankListing = [
+      {
+        name: "blank-repo",
+        description: null,
+        html_url: "https://github.com/kev/blank-repo",
+        language: null,
+        topics: [],
+        stargazers_count: 0,
+        pushed_at: "2026-05-15T00:00:00Z",
+        fork: false,
+      },
+    ];
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": blankListing,
+      "https://api.github.com/repos/kev/blank-repo/languages": {},
+      "https://api.github.com/repos/kev/blank-repo/readme": {
+        content: Buffer.from("   \n\t\n ").toString("base64"),
+        encoding: "base64",
+      },
+    };
+    const repos = await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
+    expect(repos).toEqual([]);
+    expect(await Bun.file(join(cacheDir, "kev--blank-repo.json")).exists()).toBe(false);
+  });
+
+  test("keeps a readme byte-identical when it only has trailing whitespace", async () => {
+    const cacheDir = tempCacheDir();
+    const routes = routesFor(LISTING);
+    routes["https://api.github.com/repos/kev/warren/readme"] = {
+      content: Buffer.from("# Warren\nSandboxed agent control plane\n").toString("base64"),
+      encoding: "base64",
+    };
+    const repos = await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
+    expect(repos[0]?.readme).toBe("# Warren\nSandboxed agent control plane\n");
+  });
 });
 
 describe("fetchGithubRepos authenticated", () => {

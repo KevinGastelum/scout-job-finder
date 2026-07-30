@@ -140,9 +140,10 @@ export async function fetchGithubRepos(
             `${GITHUB_API}/repos/${owner}/${item.name}/readme`,
           );
           if (typeof reply.content === "string" && reply.encoding === "base64") {
-            readme = Buffer.from(reply.content, "base64")
-              .toString("utf-8")
-              .slice(0, MAX_README_CHARS);
+            const decoded = Buffer.from(reply.content, "base64").toString("utf-8");
+            // a blank README must collapse to null, or the empty-content checks below read it
+            // as real content and cache the repo as permanently skipped
+            readme = decoded.trim().length === 0 ? null : decoded.slice(0, MAX_README_CHARS);
           }
         } catch (error) {
           if (!(error instanceof HttpError && error.status === 404)) throw error;
