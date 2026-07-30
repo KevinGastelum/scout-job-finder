@@ -1,6 +1,7 @@
 import { defaultDbPath, getLatestRun, listActiveJobs, loadProfile, openDb } from "@scout/core";
 import {
   ClaudeCliClient,
+  AshbyAdapter,
   GreenhouseAdapter,
   HnAdapter,
   LeverAdapter,
@@ -21,6 +22,7 @@ const summary = await runScan({
     new RemotiveAdapter(),
     new GreenhouseAdapter(),
     new LeverAdapter(),
+    new AshbyAdapter(),
     new HnAdapter(createDbHnCache(db)),
   ],
   http,

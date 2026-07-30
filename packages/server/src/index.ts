@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defaultDbPath, loadProfile, openDb } from "@scout/core";
 import {
   ClaudeCliClient,
+  AshbyAdapter,
   GreenhouseAdapter,
   HnAdapter,
   LeverAdapter,
@@ -28,6 +29,7 @@ const handleApi = createApp({
         new RemotiveAdapter(),
         new GreenhouseAdapter(),
         new LeverAdapter(),
+        new AshbyAdapter(),
         new HnAdapter(createDbHnCache(db)),
       ],
       http: createHttpClient(),

@@ -18,6 +18,7 @@ const SAFE_URL_FALLBACK: Record<SourceId, string> = {
   remotive: "https://remotive.com",
   greenhouse: "https://www.greenhouse.io",
   lever: "https://www.lever.co",
+  ashby: "https://www.ashbyhq.com",
   hn: "https://news.ycombinator.com",
 };
 

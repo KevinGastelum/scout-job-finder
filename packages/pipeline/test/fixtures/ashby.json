@@ -1,0 +1,81 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "cd3eacfe-1169-4df0-8164-93a857d5ddf0",
+      "title": "Forward Deployed Engineer",
+      "department": "Engineering",
+      "team": "Applied AI",
+      "employmentType": "FullTime",
+      "location": "San Francisco",
+      "isListed": true,
+      "isRemote": null,
+      "workplaceType": "Remote",
+      "publishedAt": "2026-07-26T19:04:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeai/cd3eacfe-1169-4df0-8164-93a857d5ddf0",
+      "applyUrl": "https://jobs.ashbyhq.com/acmeai/cd3eacfe-1169-4df0-8164-93a857d5ddf0/application",
+      "descriptionPlain": "Own our agent platform end to end.",
+      "descriptionHtml": "<p>Own our agent platform end to end.</p>",
+      "compensation": {
+        "compensationTierSummary": "$200K – $260K • Offers Equity",
+        "scrapeableCompensationSalarySummary": "$200K - $260K",
+        "compensationTiers": [],
+        "summaryComponents": []
+      }
+    },
+    {
+      "id": "9f21b7aa-0c44-4a1e-9d33-1c0a55e2b100",
+      "title": "Solutions Architect",
+      "department": "Go To Market",
+      "team": "Solutions",
+      "employmentType": "FullTime",
+      "location": "New York",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "OnSite",
+      "publishedAt": "2026-07-20T09:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeai/9f21b7aa-0c44-4a1e-9d33-1c0a55e2b100",
+      "descriptionPlain": "",
+      "descriptionHtml": "<p>Run <strong>presales</strong> proofs of concept.</p>",
+      "compensation": {
+        "compensationTierSummary": null,
+        "scrapeableCompensationSalarySummary": null,
+        "compensationTiers": [],
+        "summaryComponents": []
+      }
+    },
+    {
+      "id": "b4c7f001-3a91-4d62-bb18-2ee6cf40a7d5",
+      "title": "Staff Platform Engineer",
+      "department": "Engineering",
+      "employmentType": "FullTime",
+      "location": "Heidelberg",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Hybrid",
+      "publishedAt": "2026-07-22T09:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeai/b4c7f001-3a91-4d62-bb18-2ee6cf40a7d5",
+      "descriptionPlain": "Two days a week in our Heidelberg office."
+    },
+    {
+      "id": "3ac10f88-5555-4bb2-9a77-77c0de1f9911",
+      "title": "   ",
+      "department": "Engineering",
+      "location": "Remote",
+      "isListed": true,
+      "publishedAt": "2026-07-19T09:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeai/3ac10f88-5555-4bb2-9a77-77c0de1f9911",
+      "descriptionPlain": "No title on this one."
+    },
+    {
+      "id": "7bb9c210-2222-4ccc-8888-4d0a11e73344",
+      "title": "Unlisted Internal Role",
+      "department": "Engineering",
+      "location": "Remote",
+      "isListed": false,
+      "publishedAt": "2026-07-18T09:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/acmeai/7bb9c210-2222-4ccc-8888-4d0a11e73344",
+      "descriptionPlain": "Should never be ingested."
+    }
+  ]
+}

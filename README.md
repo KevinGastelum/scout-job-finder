@@ -25,6 +25,7 @@ interactive Claude sessions, so extraction and scoring are batched, budgeted and
 | Remotive | `remotive.com/api/remote-jobs` | Structured, no key |
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` | Per-token, curated seed list |
 | Lever | `api.lever.co/v0/postings/{token}` | Per-token, curated seed list |
+| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Per-slug, curated seed list; whole board in one unpaginated response |
 | HN Who's Hiring | `hn.algolia.com/api/v1` | Free-form comments, LLM-extracted and cached |
 
 ## Setup
@@ -52,7 +53,7 @@ Other commands:
 ```bash
 bun test
 bun run typecheck
-bun run verify-boards   # probe the Greenhouse/Lever seed tokens
+bun run verify-boards   # probe the Greenhouse/Lever/Ashby seed tokens
 ```
 
 Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MODEL` (model for
@@ -69,7 +70,7 @@ Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MO
 
 ## Scope
 
-This is P1: four sources, identity resolution, the scoring funnel, and a minimal Today view.
+This is P1: five sources, identity resolution, the scoring funnel, and a minimal Today view.
 Market intel, the full dashboard, the tailoring engine and the automation ladder are later
 phases — see `docs/superpowers/specs/2026-07-28-agentic-job-finder-design.md`.
 

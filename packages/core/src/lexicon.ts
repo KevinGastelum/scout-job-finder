@@ -44,6 +44,28 @@ export const SKILL_LEXICON: SkillEntry[] = [
   { canonical: "spark", aliases: ["pyspark"], rare: false },
   { canonical: "fastapi", aliases: [], rare: false },
   { canonical: "graphql", aliases: [], rare: false },
+  // Bare "go" is not matchable here: matching is word-boundary with no context, so it
+  // fires on "go to market", "go live", "on the go". Undercounting Go beats inventing it.
+  { canonical: "golang", aliases: ["go lang"], rare: false },
+  { canonical: "observability", aliases: [], rare: false },
+  { canonical: "distributed systems", aliases: [], rare: false },
+  { canonical: "ci/cd", aliases: ["cicd", "continuous integration"], rare: false },
+  // Canonical is the singular "llm" because that is the string the compiled profile
+  // stores; retrieval compares canonical job hits against profile skills verbatim.
+  { canonical: "llm", aliases: ["llms", "large language model", "large language models"], rare: false },
+  { canonical: "workflows", aliases: ["workflow"], rare: false },
+  { canonical: "end-to-end", aliases: ["end to end"], rare: false },
+  { canonical: "presales", aliases: ["pre-sales", "solutions engineer", "solutions architect"], rare: true },
+  { canonical: "customer facing", aliases: ["customer-facing", "client facing", "client-facing"], rare: true },
+  { canonical: "stakeholder management", aliases: [], rare: true },
+  { canonical: "proof of concept", aliases: ["poc", "prototype"], rare: false },
+  { canonical: "consulting", aliases: [], rare: false },
+  { canonical: "cross functional", aliases: ["cross-functional"], rare: false },
+  { canonical: "mentoring", aliases: ["mentorship"], rare: false },
+  { canonical: "technical writing", aliases: [], rare: false },
+  { canonical: "data pipeline", aliases: ["data pipelines"], rare: false },
+  { canonical: "etl", aliases: ["elt"], rare: false },
+  { canonical: "data modeling", aliases: [], rare: false },
 ];
 
 export const RARE_SKILLS: string[] = SKILL_LEXICON.filter((entry) => entry.rare).map(

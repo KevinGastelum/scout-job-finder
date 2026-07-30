@@ -8,8 +8,8 @@ import {
 } from "../src/types";
 
 describe("domain constants", () => {
-  test("exposes the four P1 sources", () => {
-    expect([...SOURCE_IDS]).toEqual(["remotive", "greenhouse", "lever", "hn"]);
+  test("exposes every ingest source", () => {
+    expect([...SOURCE_IDS]).toEqual(["remotive", "greenhouse", "lever", "ashby", "hn"]);
   });
 
   test("seniority ladder is ordered low to high", () => {

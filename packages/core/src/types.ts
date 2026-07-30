@@ -1,4 +1,4 @@
-export const SOURCE_IDS = ["remotive", "greenhouse", "lever", "hn"] as const;
+export const SOURCE_IDS = ["remotive", "greenhouse", "lever", "ashby", "hn"] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 
 export const TITLE_FAMILIES = [

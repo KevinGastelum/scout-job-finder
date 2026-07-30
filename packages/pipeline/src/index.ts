@@ -109,6 +109,7 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
   return { runId, stats, scored: funnel?.scored ?? 0, funnel };
 }
 
+export { AshbyAdapter } from "./adapters/ashby";
 export { GreenhouseAdapter } from "./adapters/greenhouse";
 export { LeverAdapter } from "./adapters/lever";
 export { RemotiveAdapter } from "./adapters/remotive";
