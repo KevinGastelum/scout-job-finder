@@ -30,3 +30,15 @@ From the P1 pre-merge reviews (final code review + Codex audit, 2026-07-29). Non
 - Hand-curated skill exclusion list so rejected generated skills don't reappear on every ingest.
 - Windows: a timed-out claude call through a .cmd shim kills cmd.exe but can orphan the child process (taskkill /t candidate).
 - DNS-rebinding hardening for the local server: validate the Host header allowlist (localhost/127.0.0.1).
+
+## From ingestion re-review (2026-07-29)
+- Local-repo dedup is name-only, so a clone named `tool` is dropped when an owned GitHub repo
+  is also named `tool`. Now that nothing is dropped for ownership, this is the only remaining
+  path that silently loses evidence — compare parsed remote `owner/name` first and fall back
+  to the basename.
+- README/manifest reads don't check whether the path is a symlink escaping the repo directory,
+  so a `README.md` symlink could pull arbitrary file content into the LLM prompt and into
+  `profile/generated.json`. Low likelihood, cheap guard.
+- The authenticated pagination cap counts raw listing entries before the fork filter, so a
+  fork-heavy first two pages could stop pagination below 120 eligible repos. Unreachable at
+  the current 79 owned repos; revisit if the account grows past ~200.
