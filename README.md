@@ -26,9 +26,9 @@ companies worth watching; the keyless aggregators give breadth without more slug
 | Source | API | Notes |
 | --- | --- | --- |
 | Remotive | `remotive.com/api/remote-jobs` | Structured, no key |
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` | Per-token, curated seed list |
-| Lever | `api.lever.co/v0/postings/{token}` | Per-token, curated seed list |
-| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Per-slug, curated seed list; whole board in one unpaginated response, behind a ~10s server-side latency floor |
+| Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` | Per-token, curated seed list (26 boards) |
+| Lever | `api.lever.co/v0/postings/{token}` | Per-token, curated seed list (2 boards) |
+| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Per-slug, curated seed list (76 boards); whole board in one unpaginated response, behind a ~10s server-side latency floor |
 | Workable | `apply.workable.com/api/v1/widget/accounts/{slug}` | Per-slug, keyless |
 | Teamtailor | `{slug}.teamtailor.com/jobs.json` | Per-slug, keyless; the token carries its region (`lindy.na`, not `lindy`) |
 | The Muse | `themuse.com/api/public/jobs` | Keyless, paginated; broad industry mix, so most items fall out at the title filter |

@@ -28,6 +28,13 @@ From the P1 pre-merge reviews (final code review + Codex audit, 2026-07-29). Non
 ## Coverage
 - Lever seed list has only one verified token (mistral, currently zero postings);
   research real Lever board slugs for AI companies.
+- **`verify-boards` counts postings without reading them, so a tombstone board reads as live.**
+  Anyscale's Lever board answers 200 with a single posting whose title is "We have moved our
+  Careers Page to: https://jobs.ashbyhq.com/anyscale". The verifier reports PASS and prints it
+  in the "set verified: true" list, which is advice to re-break the seed. Only a comment in
+  `seed-companies.ts` currently prevents that. Cheap fix: flag a board whose entire posting set
+  looks like a redirect notice, or at minimum stop recommending a flip for a row already
+  deliberately marked false.
 - ~~25 of 34 Greenhouse seed tokens 404~~ — partly resolved 2026-07-29. The cause for
   Cohere, Sierra, Perplexity, Pinecone, LangChain and Deepgram was an ATS migration, not
   a wrong slug: all six are on Ashby now and are verified there. Their dead
