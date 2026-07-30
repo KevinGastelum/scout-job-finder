@@ -58,6 +58,8 @@ Batch those edits and let one scan absorb them.
 - **Scan different local roots**: Set `SCOUT_LOCAL_REPO_ROOTS` to a comma-separated list of directories to override the default `~/Documents/Coding` + `~/Projects`. Repos are found one and two levels deep.
 - **Update manual profile**: After editing `profile/profile.md`, recompile by running `bun run profile` (`just profile`).
 - **Batch profile edits**: Every edit to `profile/profile.md` or to the generated skill set changes `profile.version`, which invalidates the rubric cache and re-queues the whole shortlist for scoring. Make all your edits, then ingest once.
+- **Re-score without re-fetching**: `bun run score` runs the funnel alone over the jobs already in the database — no network, no source sweep. Use it after a profile or filter change, when the postings are still fresh and only the judgement needs redoing. `bun run scan` is for collecting new postings.
+- **Don't leave a scan running across a profile change.** A scan reads the profile once at startup, so one already in flight keeps scoring against the version it loaded; those rows can never be a cache hit afterwards and the quota is spent for nothing. Stop it, recompile, then `bun run score`.
 
 ### Market intel
 - **Refresh the demand report**: Run `just intel` after a scan. It reads only the local database — zero LLM calls, zero network — and writes two files.
@@ -94,6 +96,7 @@ One aggregator asks for credit in its terms, and the ask is about *republishing*
 | --- | --- | --- |
 | `just ingest` (`bun run ingest`) | Extracts GitHub repos (private too, with a token), local git checkouts, and `profile/resume.md` into `profile/generated.json`, then recompiles `profile/profile.json` | GitHub: 1 listing call + 2 per uncached repo (≤41 unauthenticated, ≤243 authenticated). Local repo scan is filesystem-only. Plus one `claude` call per changed document — unchanged documents are served from cache |
 | `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, Workable, Teamtailor, We Work Remotely, The Muse, Arbeitnow, Himalayas, Jobicy, LinkedIn, USAJobs, Adzuna, and HN, deduplicates, and scores candidates | Source job APIs + up to 250 `claude` LLM rubric calls, 5 at a time. Only postings new since the last scan cost a call — the rest come from cache. USAJobs and Adzuna each skip with a message if their keys are unset — the rest of the scan is unaffected |
+| `bun run score` | Re-runs the funnel over the jobs already collected, without fetching anything | Up to 250 `claude` rubric calls, 5 at a time. 0 network |
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
 | `bun run scripts/discover-board.ts [Name=domain ...]` | Finds the applicant tracking system behind a company's careers page: fingerprints the HTML, falls back to its JS bundles, reports any embedded posting JSON, then probes every keyless board API for the likely tokens. With no arguments it runs the `verified: false` seed rows | Careers page + up to 12 bundles + one probe per provider/token pair, paced at 300ms. 0 LLM |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |
