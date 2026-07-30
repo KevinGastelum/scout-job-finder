@@ -262,4 +262,79 @@ describe("LinkedInAdapter", () => {
     );
     expect(result.items[0]?.location).toBeNull();
   });
+
+  describe("stored descriptions", () => {
+    const twoCards = {
+      "start=0": searchPage([
+        card({ id: "1111111111", title: "Known Role", company: "Acme", location: "Remote" }),
+        card({ id: "2222222222", title: "New Role", company: "Beta", location: "Remote" }),
+      ]),
+    };
+
+    function countingHttp(pages: Record<string, string>) {
+      const detailUrls: string[] = [];
+      const handler = routed(pages);
+      return {
+        detailUrls,
+        client: http((url) => {
+          if (url.includes("/jobPosting/")) detailUrls.push(url);
+          return handler(url);
+        }),
+      };
+    }
+
+    test("skips the detail request for a posting already stored", async () => {
+      const { detailUrls, client } = countingHttp(twoCards);
+      const result = await new LinkedInAdapter(["data engineer"], 0).fetch({
+        ...context(client),
+        storedDescriptions: () => new Map([["1111111111", "Previously fetched body."]]),
+      });
+
+      expect(detailUrls).toEqual(["https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/2222222222"]);
+      expect(result.items.length).toBe(2);
+      expect(result.items.find((i) => i.sourceNativeId === "1111111111")?.description).toBe(
+        "Previously fetched body.",
+      );
+      expect(result.items.find((i) => i.sourceNativeId === "2222222222")?.description).toContain(
+        "We need a data engineer",
+      );
+    });
+
+    // The card is re-read from the search page every run, so a title or location change still
+    // lands even though the body is reused.
+    test("still uses the freshly parsed card fields around a reused body", async () => {
+      const { client } = countingHttp(twoCards);
+      const result = await new LinkedInAdapter(["data engineer"], 0).fetch({
+        ...context(client),
+        storedDescriptions: () => new Map([["1111111111", "Previously fetched body."]]),
+      });
+
+      const reused = result.items.find((i) => i.sourceNativeId === "1111111111");
+      expect(reused?.title).toBe("Known Role");
+      expect(reused?.company).toBe("Acme");
+      expect(reused?.location).toBe("Remote");
+    });
+
+    test("asks for every deduplicated card id exactly once", async () => {
+      const asked: string[][] = [];
+      const { client } = countingHttp(twoCards);
+      await new LinkedInAdapter(["data engineer", "ai engineer"], 0).fetch({
+        ...context(client),
+        storedDescriptions: (ids) => {
+          asked.push([...ids]);
+          return new Map();
+        },
+      });
+
+      expect(asked.length).toBe(1);
+      expect(asked[0]?.sort()).toEqual(["1111111111", "2222222222"]);
+    });
+
+    test("fetches every detail when no lookup is supplied", async () => {
+      const { detailUrls, client } = countingHttp(twoCards);
+      const result = await new LinkedInAdapter(["data engineer"], 0).fetch(context(client));
+      expect(detailUrls.length).toBe(2);
+      expect(result.items.length).toBe(2);
+    });
+  });
 });

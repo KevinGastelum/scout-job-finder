@@ -182,7 +182,30 @@ export class LinkedInAdapter implements SourceAdapter {
       }
     }
 
+    // The detail fetch is what makes this adapter slow: one paced request per posting, and most
+    // postings were already collected on an earlier run. A LinkedIn description does not change
+    // after publication, and the card fields around it are re-read from the search page every
+    // run, so reusing a stored body costs nothing but saves a request apiece.
+    const stored = context.storedDescriptions?.([...cards.keys()]) ?? new Map<string, string>();
+
     for (const card of cards.values()) {
+      const cached = stored.get(card.jobId);
+      if (cached !== undefined) {
+        items.push({
+          sourceNativeId: card.jobId,
+          payload: { ...card, description: cached },
+          url: card.url,
+          company: card.company,
+          title: card.title,
+          location: card.location,
+          remote: true,
+          salaryText: null,
+          postedAt: card.postedAt,
+          description: cached,
+        });
+        continue;
+      }
+
       const url = detailUrl(card.jobId);
       queries.push(url);
 

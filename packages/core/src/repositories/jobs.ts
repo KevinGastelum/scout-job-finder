@@ -193,6 +193,36 @@ export function getJobById(db: Database, jobId: number): Job | null {
   return row === null ? null : toJob(row);
 }
 
+// SQLite's default parameter ceiling is 999, so the id list is asked for in chunks rather than
+// as one statement that would fail exactly when a fetch was large enough to be worth caching.
+const DESCRIPTION_LOOKUP_CHUNK = 500;
+
+// Adapters that pay one request per posting to fetch its body use this to skip the postings they
+// already hold. Only non-empty descriptions are returned: a stored blank is the failure this is
+// meant to retry, not a cache hit.
+export function findDescriptionsBySourceIds(
+  db: Database,
+  source: SourceId,
+  sourceNativeIds: readonly string[],
+): Map<string, string> {
+  const found = new Map<string, string>();
+
+  for (let start = 0; start < sourceNativeIds.length; start += DESCRIPTION_LOOKUP_CHUNK) {
+    const chunk = sourceNativeIds.slice(start, start + DESCRIPTION_LOOKUP_CHUNK);
+    if (chunk.length === 0) continue;
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = db
+      .query<{ source_native_id: string; description: string }, string[]>(
+        `SELECT source_native_id, description FROM jobs
+         WHERE source = ? AND source_native_id IN (${placeholders}) AND description <> ''`,
+      )
+      .all(source, ...chunk);
+    for (const row of rows) found.set(row.source_native_id, row.description);
+  }
+
+  return found;
+}
+
 // `coveredSince` scopes the sweep to the window the fetch actually paged through. A source that
 // walks a date-ordered feed sees only its newest slice, so absence from this run says nothing
 // about a posting older than that slice — sweeping it would expire a job still live on the board.

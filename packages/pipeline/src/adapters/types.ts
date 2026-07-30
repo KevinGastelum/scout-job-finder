@@ -29,6 +29,10 @@ export interface AdapterContext {
   http: HttpClient;
   llm: LlmClient;
   now: () => Date;
+  // Descriptions already stored for this source, by native id. An adapter that spends one request
+  // per posting to fetch its body can skip the ones it already holds. Optional because a caller
+  // without a database — a test, a probe — still has to be able to build a context.
+  storedDescriptions?: (sourceNativeIds: readonly string[]) => Map<string, string>;
 }
 
 export interface SourceAdapter {

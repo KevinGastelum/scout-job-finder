@@ -4,6 +4,7 @@ import { openDb } from "../src/db";
 import { insertRawPosting } from "../src/repositories/raw-postings";
 import { startRun } from "../src/repositories/runs";
 import {
+  findDescriptionsBySourceIds,
   findJobByCanonicalUrl,
   findJobBySourceId,
   findJobsByFingerprintKey,
@@ -98,6 +99,44 @@ describe("lookups", () => {
     const matches = findJobsByFingerprintKey(db, "acme ai", "ai-engineer", "remote:us");
     expect(matches.length).toBe(1);
     expect(matches[0]?.title).toBe("AI Engineer");
+    db.close();
+  });
+});
+
+describe("findDescriptionsBySourceIds", () => {
+  test("returns stored descriptions for the requested source only", async () => {
+    const { db, rawId } = await seed();
+    upsertJob(db, makeJob({ sourceNativeId: "a", description: "Build agents." }), rawId, "canon-a", "2026-07-28T10:00:00.000Z");
+    upsertJob(db, makeJob({ source: "jobicy", sourceNativeId: "a", description: "Other board." }), rawId, "canon-b", "2026-07-28T10:00:00.000Z");
+
+    const found = findDescriptionsBySourceIds(db, "remotive", ["a", "missing"]);
+    expect(found.get("a")).toBe("Build agents.");
+    expect(found.has("missing")).toBe(false);
+    expect(found.size).toBe(1);
+    db.close();
+  });
+
+  // A blank stored body is the fetch that failed last run, not something worth reusing.
+  test("omits jobs whose stored description is empty", async () => {
+    const { db, rawId } = await seed();
+    upsertJob(db, makeJob({ sourceNativeId: "blank", description: "" }), rawId, "canon-c", "2026-07-28T10:00:00.000Z");
+    expect(findDescriptionsBySourceIds(db, "remotive", ["blank"]).size).toBe(0);
+    db.close();
+  });
+
+  test("handles an id list longer than SQLite's parameter ceiling", async () => {
+    const { db, rawId } = await seed();
+    upsertJob(db, makeJob({ sourceNativeId: "wanted", description: "Build agents." }), rawId, "canon-d", "2026-07-28T10:00:00.000Z");
+
+    const ids = [...Array.from({ length: 1200 }, (_unused, i) => `filler-${i}`), "wanted"];
+    const found = findDescriptionsBySourceIds(db, "remotive", ids);
+    expect(found.get("wanted")).toBe("Build agents.");
+    db.close();
+  });
+
+  test("returns an empty map for an empty id list", async () => {
+    const { db } = await seed();
+    expect(findDescriptionsBySourceIds(db, "remotive", []).size).toBe(0);
     db.close();
   });
 });

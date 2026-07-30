@@ -1,5 +1,6 @@
 import {
   MAX_MISSED_RUNS,
+  findDescriptionsBySourceIds,
   finishRun,
   insertRawPosting,
   startRun,
@@ -58,7 +59,12 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
     };
 
     try {
-      const result = await adapter.fetch({ http, llm: adapterLlm, now });
+      const result = await adapter.fetch({
+        http,
+        llm: adapterLlm,
+        now,
+        storedDescriptions: (ids) => findDescriptionsBySourceIds(db, adapter.id, ids),
+      });
       entry.queries = result.queries;
       entry.errors = [...result.errors];
       entry.fetched = result.items.length;

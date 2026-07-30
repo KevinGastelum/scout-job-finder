@@ -36,7 +36,7 @@ companies worth watching; the keyless aggregators give breadth without more slug
 | Himalayas | `himalayas.app/jobs/api` | Keyless, remote-only; caps a response at 20 however large a `limit` is sent, so paging strides by the served count. ~99k deep and newest-first, so the walk covers a freshness window (~7k postings) rather than the whole feed |
 | Jobicy | `jobicy.com/api/v2/remote-jobs` | Keyless, remote-only; flat `salaryMin`/`salaryMax` fields |
 | We Work Remotely | `weworkremotely.com/categories/{category}` | Keyless RSS per category |
-| LinkedIn | `linkedin.com/jobs-guest/jobs/api` | Guest endpoints, no key; by far the slowest source, one detail fetch per posting |
+| LinkedIn | `linkedin.com/jobs-guest/jobs/api` | Guest endpoints, no key; the slowest source — 429s above ~2 req/s, so it self-paces at one detail fetch per new posting. Bodies already stored are reused, so a warm database skips most of them |
 | USAJobs | `data.usajobs.gov/api/search` | Free key; the registered email is sent as `User-Agent`, so both values are required |
 | Adzuna | `api.adzuna.com/v1/api/jobs/us/search` | Free key; aggregates Indeed/Glassdoor inventory |
 | HN Who's Hiring | `hn.algolia.com/api/v1` | Free-form comments, LLM-extracted and cached |
