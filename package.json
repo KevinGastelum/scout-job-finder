@@ -5,6 +5,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "scan": "bun run scripts/scan.ts",
+    "score": "bun run scripts/score.ts",
     "profile": "bun run scripts/compile-profile.ts",
     "ingest": "bun run scripts/ingest-profile.ts && bun run profile",
     "intel": "bun run scripts/intel.ts",
