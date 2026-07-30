@@ -60,6 +60,7 @@ Batch those edits and let one scan absorb them.
 - **Batch profile edits**: Every edit to `profile/profile.md` or to the generated skill set changes `profile.version`, which invalidates the rubric cache and re-queues the whole shortlist for scoring. Make all your edits, then ingest once.
 - **Re-score without re-fetching**: `bun run score` runs the funnel alone over the jobs already in the database — no network, no source sweep. Use it after a profile or filter change, when the postings are still fresh and only the judgement needs redoing. `bun run scan` is for collecting new postings.
 - **Don't leave a scan running across a profile change.** A scan reads the profile once at startup, so one already in flight keeps scoring against the version it loaded; those rows can never be a cache hit afterwards and the quota is spent for nothing. Stop it, recompile, then `bun run score`.
+- **After a hard-filter change, `SCOUT_RUBRIC_BUDGET=0 bun run score` costs nothing.** The shortlist reads the stored hard-filter verdict, which every funnel pass rewrites — so a job the tightened filter now rejects keeps its old score at the top of the list until a pass has re-judged it. A zero-budget run refreshes every verdict without spending a single rubric call.
 
 ### Market intel
 - **Refresh the demand report**: Run `just intel` after a scan. It reads only the local database — zero LLM calls, zero network — and writes two files.
