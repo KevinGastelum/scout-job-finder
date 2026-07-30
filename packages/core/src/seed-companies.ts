@@ -37,8 +37,9 @@ export const SEED_COMPANIES: SeedCompany[] = [
 
   { name: "Mistral AI", board: "lever", token: "mistral", verified: true },
   { name: "Tinybird", board: "lever", token: "tinybird", verified: true },
-  // Contextual AI renders its board client-side and its page references no ATS at all — not in
-  // the HTML and not in its bundles. Needs a browser or a human, so it stays out of the scan.
+  // Contextual AI has no ATS because it currently has no roles: rendered in a real browser, the
+  // `#open-roles` section is a heading with nothing under it, the page fires no XHR, and the whole
+  // Next.js payload names no provider. Discovery was right; there is simply nothing to fetch.
   { name: "Contextual AI", board: "lever", token: "contextualai", verified: false },
 
   // Ashby slugs bootstrapped from santifer/career-ops templates/portals.example.yml (MIT),
