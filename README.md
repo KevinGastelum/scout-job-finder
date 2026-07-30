@@ -33,7 +33,7 @@ companies worth watching; the keyless aggregators give breadth without more slug
 | Teamtailor | `{slug}.teamtailor.com/jobs.json` | Per-slug, keyless; the token carries its region (`lindy.na`, not `lindy`) |
 | The Muse | `themuse.com/api/public/jobs` | Keyless, paginated; broad industry mix, so most items fall out at the title filter |
 | Arbeitnow | `arbeitnow.com/api/job-board-api` | Keyless, single page; `created_at` is Unix epoch seconds, descriptions inconsistently entity-encoded |
-| Himalayas | `himalayas.app/jobs/api` | Keyless, remote-only; caps a response at 20 however large a `limit` is sent, so paging strides by the served count |
+| Himalayas | `himalayas.app/jobs/api` | Keyless, remote-only; caps a response at 20 however large a `limit` is sent, so paging strides by the served count. ~99k deep and newest-first, so the walk covers a freshness window (~7k postings) rather than the whole feed |
 | Jobicy | `jobicy.com/api/v2/remote-jobs` | Keyless, remote-only; flat `salaryMin`/`salaryMax` fields |
 | We Work Remotely | `weworkremotely.com/categories/{category}` | Keyless RSS per category |
 | LinkedIn | `linkedin.com/jobs-guest/jobs/api` | Guest endpoints, no key; by far the slowest source, one detail fetch per posting |

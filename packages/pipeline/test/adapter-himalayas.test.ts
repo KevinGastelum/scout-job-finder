@@ -156,20 +156,20 @@ describe("HimalayasAdapter", () => {
       context(
         http((url) => {
           const offset = Number(new URL(url).searchParams.get("offset"));
-          return { totalCount: 98180, jobs: servedPage(offset) };
+          return offset >= 80 ? { totalCount: 98180, jobs: [] } : { totalCount: 98180, jobs: servedPage(offset) };
         }),
       ),
     );
 
-    expect(result.queries).toEqual([
+    expect(result.queries.slice(0, 5)).toEqual([
       "https://himalayas.app/jobs/api?limit=100&offset=0",
       "https://himalayas.app/jobs/api?limit=100&offset=20",
       "https://himalayas.app/jobs/api?limit=100&offset=40",
       "https://himalayas.app/jobs/api?limit=100&offset=60",
       "https://himalayas.app/jobs/api?limit=100&offset=80",
     ]);
-    expect(result.items.length).toBe(100);
-    expect(new Set(result.items.map((item) => item.sourceNativeId)).size).toBe(100);
+    expect(result.items.length).toBe(80);
+    expect(new Set(result.items.map((item) => item.sourceNativeId)).size).toBe(80);
   });
 
   test("stops paginating once totalCount has been reached", async () => {
@@ -200,19 +200,76 @@ describe("HimalayasAdapter", () => {
     expect(result.items).toEqual([]);
   });
 
-  test("caps pagination at MAX_PAGES even when totalCount says there is more", async () => {
+  // 2026-07-30T10:00Z minus the three-day horizon.
+  const beforeCutoff = Date.parse("2026-07-26T10:00:00.000Z") / 1000;
+  const afterCutoff = Date.parse("2026-07-29T10:00:00.000Z") / 1000;
+
+  const dated = (guid: string, pubDate: number) => ({
+    guid,
+    title: `Role ${guid}`,
+    applicationLink: `https://himalayas.app/companies/x/jobs/${guid}`,
+    description: "x",
+    pubDate,
+  });
+
+  test("stops paging once a page falls entirely past the freshness horizon", async () => {
+    let calls = 0;
+    const result = await new HimalayasAdapter().fetch(
+      context(
+        http(() => {
+          calls += 1;
+          return {
+            totalCount: 999999,
+            jobs: calls === 1
+              ? [dated("fresh-a", afterCutoff), dated("fresh-b", afterCutoff)]
+              : [dated("stale-a", beforeCutoff), dated("stale-b", beforeCutoff)],
+          };
+        }),
+      ),
+    );
+
+    expect(calls).toBe(2);
+    expect(result.items.map((item) => item.sourceNativeId)).toEqual([
+      "fresh-a",
+      "fresh-b",
+      "stale-a",
+      "stale-b",
+    ]);
+  });
+
+  // A page straddling the horizon is kept whole rather than trimmed: the entries above the cutoff
+  // on it are real, and the walk stops right after, so nothing newer is lost.
+  test("keeps the page that straddles the horizon", async () => {
+    const result = await new HimalayasAdapter().fetch(
+      context(
+        http((url) => {
+          const offset = Number(new URL(url).searchParams.get("offset"));
+          return {
+            totalCount: 999999,
+            jobs: offset === 0
+              ? [dated("fresh", afterCutoff), dated("stale", beforeCutoff)]
+              : [dated("never", beforeCutoff)],
+          };
+        }),
+      ),
+    );
+    expect(result.items.map((item) => item.sourceNativeId)).toEqual(["fresh", "stale"]);
+  });
+
+  test("a page with no usable dates does not halt the walk", async () => {
     let calls = 0;
     await new HimalayasAdapter().fetch(
       context(
-        http((url) => {
+        http(() => {
           calls += 1;
+          if (calls >= 3) return { totalCount: 999999, jobs: [] };
           return {
             totalCount: 999999,
             jobs: [
               {
-                guid: `g${url}`,
-                title: "Filler Role",
-                applicationLink: "https://himalayas.app/companies/x/jobs/filler",
+                guid: `undated-${calls}`,
+                title: "Undated Role",
+                applicationLink: "https://himalayas.app/companies/x/jobs/undated",
                 description: "x",
               },
             ],
@@ -220,6 +277,61 @@ describe("HimalayasAdapter", () => {
         }),
       ),
     );
-    expect(calls).toBe(5);
+    expect(calls).toBe(3);
+  });
+
+  test("caps the walk at MAX_REQUESTS however deep the feed goes", async () => {
+    let calls = 0;
+    await new HimalayasAdapter().fetch(
+      context(
+        http(() => {
+          calls += 1;
+          return { totalCount: 999999, jobs: [dated(`g${calls}`, afterCutoff)] };
+        }),
+      ),
+    );
+    expect(calls).toBe(400);
+  });
+
+  test("reports no coveredSince when the walk reached the end of the feed", async () => {
+    const result = await new HimalayasAdapter().fetch(
+      context(http(() => ({ totalCount: 1, jobs: [dated("only", afterCutoff)] }))),
+    );
+    expect(result.coveredSince).toBeNull();
+  });
+
+  test("reports no coveredSince when the walk stopped on the freshness horizon", async () => {
+    let calls = 0;
+    const result = await new HimalayasAdapter().fetch(
+      context(
+        http(() => {
+          calls += 1;
+          return {
+            totalCount: 999999,
+            jobs: [dated(`g${calls}`, calls === 1 ? afterCutoff : beforeCutoff)],
+          };
+        }),
+      ),
+    );
+    expect(result.coveredSince).toBeNull();
+  });
+
+  // Only a budget-truncated walk is a partial view — it never saw the rest of the feed, so its
+  // absences cannot be read as delistings and the sweep has to be scoped to what it did see.
+  test("reports the oldest posting it saw when the request budget ran out", async () => {
+    let calls = 0;
+    const result = await new HimalayasAdapter().fetch(
+      context(
+        http(() => {
+          calls += 1;
+          return {
+            totalCount: 999999,
+            jobs: [dated(`g${calls}`, afterCutoff - calls)],
+          };
+        }),
+      ),
+    );
+    expect(calls).toBe(400);
+    expect(result.coveredSince).toBe(new Date((afterCutoff - 400) * 1000).toISOString());
   });
 });

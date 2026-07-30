@@ -140,3 +140,13 @@ Reported and rejected after checking the shipped code — recorded so they don't
 - The authenticated pagination cap counts raw listing entries before the fork filter, so a
   fork-heavy first two pages could stop pagination below 120 eligible repos. Unreachable at
   the current 79 owned repos; revisit if the account grows past ~200.
+
+## From the Himalayas coverage fix (2026-07-30)
+- A scoped sweep never expires a posting older than the covered window, so Himalayas jobs first
+  collected under the old 100-job cap stay `active` indefinitely even once they are delisted.
+  Nothing re-checks them. Wants an age-based retirement independent of the sweep — expire a job
+  whose `last_seen_at` is older than some horizon regardless of source — rather than widening
+  the sweep, which would go back to guessing about postings it never looked at.
+- The walk collects ~7.8k items for ~7.3k unique ids: offset paging over a live feed re-serves
+  entries as new postings shift the window. Upsert absorbs the duplicates, but the fetched count
+  in the run stats overstates what was actually collected.

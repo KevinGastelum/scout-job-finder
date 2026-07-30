@@ -193,17 +193,32 @@ export function getJobById(db: Database, jobId: number): Job | null {
   return row === null ? null : toJob(row);
 }
 
+// `coveredSince` scopes the sweep to the window the fetch actually paged through. A source that
+// walks a date-ordered feed sees only its newest slice, so absence from this run says nothing
+// about a posting older than that slice — sweeping it would expire a job still live on the board.
+// A job with no posted_at cannot be placed inside or outside the window, so a scoped sweep leaves
+// it alone rather than guessing. Passing null means the fetch covered the whole feed.
 export function sweepMissingJobs(
   db: Database,
   source: SourceId,
   runStartedAt: string,
   maxMissedRuns: number,
+  coveredSince: string | null = null,
 ): number {
-  db.run(
-    `UPDATE jobs SET missed_runs = missed_runs + 1
-     WHERE source = ? AND status = 'active' AND last_seen_at < ?`,
-    [source, runStartedAt],
-  );
+  if (coveredSince === null) {
+    db.run(
+      `UPDATE jobs SET missed_runs = missed_runs + 1
+       WHERE source = ? AND status = 'active' AND last_seen_at < ?`,
+      [source, runStartedAt],
+    );
+  } else {
+    db.run(
+      `UPDATE jobs SET missed_runs = missed_runs + 1
+       WHERE source = ? AND status = 'active' AND last_seen_at < ?
+         AND posted_at IS NOT NULL AND posted_at >= ?`,
+      [source, runStartedAt, coveredSince],
+    );
+  }
   const expired = db
     .query<{ count: number }, [string, number]>(
       `SELECT COUNT(*) AS count FROM jobs

@@ -87,7 +87,13 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
         }
       }
 
-      entry.expired = sweepMissingJobs(db, adapter.id, startedAt, MAX_MISSED_RUNS);
+      entry.expired = sweepMissingJobs(
+        db,
+        adapter.id,
+        startedAt,
+        MAX_MISSED_RUNS,
+        result.coveredSince ?? null,
+      );
     } catch (error) {
       entry.errors.push(`${adapter.id} adapter failed: ${describeError(error)}`);
     }

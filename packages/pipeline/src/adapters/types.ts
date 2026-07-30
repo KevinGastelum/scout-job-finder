@@ -19,6 +19,10 @@ export interface AdapterResult {
   items: RawItem[];
   queries: string[];
   errors: string[];
+  // Oldest posting this fetch is authoritative for. A source that walks a date-ordered feed too
+  // large to page in full sees only its newest slice; anything older was never in view, so its
+  // absence must not be read as a delisting. Omitted or null means the whole feed was covered.
+  coveredSince?: string | null;
 }
 
 export interface AdapterContext {

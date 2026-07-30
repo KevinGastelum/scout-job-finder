@@ -124,4 +124,43 @@ describe("sweepMissingJobs", () => {
     expect(listActiveJobs(db).length).toBe(1);
     db.close();
   });
+
+  test("does not count a miss for a job posted before the covered window", async () => {
+    const { db, rawId } = await seed();
+    upsertJob(db, makeJob({ postedAt: "2026-07-20T00:00:00.000Z" }), rawId, "canon-1", "2026-07-28T10:00:00.000Z");
+
+    for (const runAt of ["2026-07-29", "2026-07-30", "2026-07-31"]) {
+      sweepMissingJobs(db, "remotive", `${runAt}T00:00:00.000Z`, 3, "2026-07-25T00:00:00.000Z");
+    }
+
+    const stored = findJobBySourceId(db, "remotive", "1");
+    expect(stored?.missedRuns).toBe(0);
+    expect(stored?.status).toBe("active");
+    db.close();
+  });
+
+  test("still expires a job posted inside the covered window", async () => {
+    const { db, rawId } = await seed();
+    upsertJob(db, makeJob({ postedAt: "2026-07-27T00:00:00.000Z" }), rawId, "canon-1", "2026-07-28T10:00:00.000Z");
+
+    sweepMissingJobs(db, "remotive", "2026-07-29T00:00:00.000Z", 3, "2026-07-25T00:00:00.000Z");
+    sweepMissingJobs(db, "remotive", "2026-07-30T00:00:00.000Z", 3, "2026-07-25T00:00:00.000Z");
+    expect(sweepMissingJobs(db, "remotive", "2026-07-31T00:00:00.000Z", 3, "2026-07-25T00:00:00.000Z")).toBe(1);
+    expect(findJobBySourceId(db, "remotive", "1")?.status).toBe("expired");
+    db.close();
+  });
+
+  // A posting with no date cannot be placed inside or outside the window, so a scoped sweep has
+  // to leave it alone — guessing either way is a wrong answer about a job that may still be live.
+  test("skips undated jobs when the sweep is scoped", async () => {
+    const { db, rawId } = await seed();
+    upsertJob(db, makeJob({ postedAt: null }), rawId, "canon-1", "2026-07-28T10:00:00.000Z");
+
+    sweepMissingJobs(db, "remotive", "2026-07-29T00:00:00.000Z", 3, "2026-07-25T00:00:00.000Z");
+    expect(findJobBySourceId(db, "remotive", "1")?.missedRuns).toBe(0);
+
+    sweepMissingJobs(db, "remotive", "2026-07-30T00:00:00.000Z", 3);
+    expect(findJobBySourceId(db, "remotive", "1")?.missedRuns).toBe(1);
+    db.close();
+  });
 });

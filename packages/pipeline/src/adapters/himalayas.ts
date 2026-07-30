@@ -10,7 +10,13 @@ import {
 
 const ENDPOINT = "https://himalayas.app/jobs/api";
 const REQUEST_LIMIT = 100;
-const MAX_PAGES = 5;
+
+// The feed is ~99k postings deep and strictly newest-first, served 20 at a time — paging it whole
+// would cost ~5,000 requests. Walking a freshness window instead keeps the cost bounded while
+// covering everything posted since the last scan several times over: the board publishes roughly
+// 4-5k jobs a day, so this budget reaches back about two of them.
+const MAX_AGE_DAYS = 3;
+const MAX_REQUESTS = 400;
 
 interface HimalayasJob {
   title?: string;
@@ -56,6 +62,15 @@ function epochSecondsToIso(value: unknown): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
+function oldestPostedOn(jobs: HimalayasJob[]): string | null {
+  let oldest: string | null = null;
+  for (const job of jobs) {
+    const posted = epochSecondsToIso(job?.pubDate);
+    if (posted !== null && (oldest === null || posted < oldest)) oldest = posted;
+  }
+  return oldest;
+}
+
 function salaryTextFor(job: HimalayasJob): string | null {
   const hasMin = typeof job.minSalary === "number" && Number.isFinite(job.minSalary);
   const hasMax = typeof job.maxSalary === "number" && Number.isFinite(job.maxSalary);
@@ -81,10 +96,16 @@ export class HimalayasAdapter implements SourceAdapter {
 
     let totalCount: number | null = null;
     let fetchedCount = 0;
-
     let offset = 0;
+    // A walk that stops on its own terms — end of feed, or past its freshness horizon — has seen
+    // everything a sweep needs to reason about. A walk that stops because the request budget ran
+    // out has not, and its absences must not be read as delistings.
+    let stoppedOnFeed = false;
+    let oldestPostedAt: string | null = null;
 
-    for (let page = 0; page < MAX_PAGES; page += 1) {
+    const cutoff = new Date(context.now().getTime() - MAX_AGE_DAYS * 86_400_000).toISOString();
+
+    for (let page = 0; page < MAX_REQUESTS; page += 1) {
       const url = endpointFor(offset);
       queries.push(url);
 
@@ -108,7 +129,10 @@ export class HimalayasAdapter implements SourceAdapter {
         continue;
       }
 
-      if (jobs.length === 0) break;
+      if (jobs.length === 0) {
+        stoppedOnFeed = true;
+        break;
+      }
 
       for (const job of jobs as HimalayasJob[]) {
         const guid = trimmedString(job?.guid);
@@ -120,6 +144,10 @@ export class HimalayasAdapter implements SourceAdapter {
         }
 
         const applicationLink = trimmedString(job.applicationLink);
+        const postedAt = epochSecondsToIso(job.pubDate);
+        if (postedAt !== null && (oldestPostedAt === null || postedAt < oldestPostedAt)) {
+          oldestPostedAt = postedAt;
+        }
         items.push({
           sourceNativeId: guid,
           payload: job,
@@ -131,7 +159,7 @@ export class HimalayasAdapter implements SourceAdapter {
           remote: true,
           description: htmlToText(job.description ?? ""),
           salaryText: salaryTextFor(job),
-          postedAt: epochSecondsToIso(job.pubDate),
+          postedAt,
         });
       }
 
@@ -140,9 +168,21 @@ export class HimalayasAdapter implements SourceAdapter {
       // skip every job between the served page and the requested one.
       offset += jobs.length;
       fetchedCount += jobs.length;
-      if (totalCount !== null && fetchedCount >= totalCount) break;
+      if (totalCount !== null && fetchedCount >= totalCount) {
+        stoppedOnFeed = true;
+        break;
+      }
+
+      // Newest-first ordering is what makes this a stopping rule rather than a filter: once the
+      // oldest entry on a page predates the horizon, every remaining page is older still. A page
+      // carrying no usable dates says nothing either way, so it does not halt the walk.
+      const oldestOnPage = oldestPostedOn(jobs as HimalayasJob[]);
+      if (oldestOnPage !== null && oldestOnPage < cutoff) {
+        stoppedOnFeed = true;
+        break;
+      }
     }
 
-    return { items, queries, errors };
+    return { items, queries, errors, coveredSince: stoppedOnFeed ? null : oldestPostedAt };
   }
 }
