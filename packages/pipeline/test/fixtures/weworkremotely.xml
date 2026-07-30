@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss">
+  <channel>
+    <title>We Work Remotely</title>
+    <item>
+      <media:content url="https://wwr-pro.s3.amazonaws.com/logos/0171/4689/logo.gif" type="image/png"/>
+      <title>Reveleer: Full Stack AI Engineer</title>
+      <region>Anywhere in the World</region>
+      <category>Back-End Programming</category>
+      <description>&lt;p&gt;&lt;strong&gt;Headquarters:&lt;/strong&gt; United States&lt;/p&gt;&lt;p&gt;Build the next generation agentic model.&lt;/p&gt;</description>
+      <pubDate>Thu, 02 Apr 2026 20:46:00 +0000</pubDate>
+      <guid>https://weworkremotely.com/remote-jobs/reveleer-full-stack-ai-engineer</guid>
+      <link>https://weworkremotely.com/remote-jobs/reveleer-full-stack-ai-engineer</link>
+    </item>
+    <item>
+      <title>Globex: Platform Engineer: Kubernetes</title>
+      <region>Europe Only</region>
+      <category>DevOps</category>
+      <description><![CDATA[<p>Run the fleet.</p>]]></description>
+      <pubDate>Mon, 06 Jul 2026 11:02:00 +0000</pubDate>
+      <guid>https://weworkremotely.com/remote-jobs/globex-platform-engineer</guid>
+      <link>https://weworkremotely.com/remote-jobs/globex-platform-engineer</link>
+    </item>
+    <item>
+      <title>No separator in this heading</title>
+      <region>Anywhere in the World</region>
+      <description>&lt;p&gt;Unparseable heading.&lt;/p&gt;</description>
+      <pubDate>Mon, 06 Jul 2026 11:03:00 +0000</pubDate>
+      <guid>https://weworkremotely.com/remote-jobs/no-separator</guid>
+      <link>https://weworkremotely.com/remote-jobs/no-separator</link>
+    </item>
+  </channel>
+</rss>

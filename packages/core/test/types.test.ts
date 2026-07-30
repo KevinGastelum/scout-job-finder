@@ -24,6 +24,8 @@ describe("domain constants", () => {
       "adzuna",
       "workable",
       "teamtailor",
+      "remoteok",
+      "weworkremotely",
     ]);
   });
 

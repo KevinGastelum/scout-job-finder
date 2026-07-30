@@ -117,9 +117,11 @@ export { HimalayasAdapter } from "./adapters/himalayas";
 export { JobicyAdapter } from "./adapters/jobicy";
 export { LeverAdapter } from "./adapters/lever";
 export { LinkedInAdapter, QUERIES as LINKEDIN_QUERIES } from "./adapters/linkedin";
+export { RemoteOkAdapter } from "./adapters/remoteok";
 export { RemotiveAdapter } from "./adapters/remotive";
 export { TeamtailorAdapter } from "./adapters/teamtailor";
 export { TheMuseAdapter } from "./adapters/themuse";
+export { WeWorkRemotelyAdapter } from "./adapters/weworkremotely";
 export { WorkableAdapter } from "./adapters/workable";
 export {
   UsaJobsAdapter,

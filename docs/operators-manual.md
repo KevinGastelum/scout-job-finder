@@ -74,6 +74,13 @@ Batch those edits and let one scan absorb them.
 - **A hit with 0 postings is not a board.** SmartRecruiters answers any parseable slug with an empty list, so the script requires at least one posting before reporting.
 - **Acquisitions and rebrands are the common cause of a dead token**, not a broken script: Codeium's roles moved to Cognition's board, Weights & Biases' to CoreWeave's, and TravelPerk's followed its rename to Perk.
 
+### Source attribution
+
+Two aggregators ask for credit in their terms, and both asks are about *republishing*. Scout's dashboard binds to 127.0.0.1 and shows postings only to you, so nothing is being republished today. If that ever changes — a public demo of the dashboard, screenshots in a portfolio write-up — these become live obligations:
+
+- **RemoteOK** asks for a followed link back to the posting URL and a mention of the name, on pain of API suspension. Scout already stores their canonical URL as the job link, so a public view that renders job links satisfies the link half.
+- **Jobicy** returns a `friendlyNotice` field requesting attribution.
+
 ### Troubleshooting
 - **`bun: command not found`**: Bun installs to `~/.bun/bin`, which some shells (and MSYS2) don't pick up. Add it to `PATH`: `export PATH="$HOME/.bun/bin:$PATH"`.
 - **GitHub rate limits**: If repo extraction hits rate limits, set `GITHUB_TOKEN` or authenticate with `gh` CLI; otherwise wait for the hourly rate-limit reset.
@@ -87,7 +94,7 @@ Batch those edits and let one scan absorb them.
 | Command | What it does | Network / LLM cost |
 | --- | --- | --- |
 | `just ingest` (`bun run ingest`) | Extracts GitHub repos (private too, with a token), local git checkouts, and `profile/resume.md` into `profile/generated.json`, then recompiles `profile/profile.json` | GitHub: 1 listing call + 2 per uncached repo (≤41 unauthenticated, ≤243 authenticated). Local repo scan is filesystem-only. Plus one `claude` call per changed document — unchanged documents are served from cache |
-| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, Workable, Teamtailor, The Muse, Arbeitnow, Himalayas, Jobicy, LinkedIn, USAJobs, Adzuna, and HN, deduplicates, and scores candidates | Source job APIs + up to 250 `claude` LLM rubric calls, 5 at a time. Only postings new since the last scan cost a call — the rest come from cache. USAJobs and Adzuna each skip with a message if their keys are unset — the rest of the scan is unaffected |
+| `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, Workable, Teamtailor, RemoteOK, We Work Remotely, The Muse, Arbeitnow, Himalayas, Jobicy, LinkedIn, USAJobs, Adzuna, and HN, deduplicates, and scores candidates | Source job APIs + up to 250 `claude` LLM rubric calls, 5 at a time. Only postings new since the last scan cost a call — the rest come from cache. USAJobs and Adzuna each skip with a message if their keys are unset — the rest of the scan is unaffected |
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
 | `bun run scripts/discover-board.ts [Name=domain ...]` | Finds the applicant tracking system behind a company's careers page: fingerprints the HTML, falls back to its JS bundles, reports any embedded posting JSON, then probes every keyless board API for the likely tokens. With no arguments it runs the `verified: false` seed rows | Careers page + up to 12 bundles + one probe per provider/token pair, paced at 300ms. 0 LLM |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |
