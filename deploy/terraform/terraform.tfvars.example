@@ -1,6 +1,8 @@
 # Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
 project_id        = "scout-123456"
-github_repository = "kevingastelum/scout"
+# Casing must match GitHub exactly — this lands in the OIDC `assertion.repository` claim,
+# and a case-mismatched value silently fails every token exchange.
+github_repository = "KevinGastelum/scout-job-finder"
 
 # region = "us-central1"
 # name   = "scout"

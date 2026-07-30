@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/kevingastelum/scout
+  repository: ghcr.io/kevingastelum/scout-job-finder
   # Empty falls back to .Chart.AppVersion.
   tag: ""
   pullPolicy: IfNotPresent

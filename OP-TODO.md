@@ -23,12 +23,14 @@ The current sample is 92% Greenhouse and arbitrary (25 of 34 attempted company
 board tokens 404). Two of the fixes need a key from you; the rest are pure dev
 work with no account required.
 
-- [ ] **Adzuna API key** — free. Sign up at https://developer.adzuna.com/,
+- [x] **Adzuna API key** — free. Sign up at https://developer.adzuna.com/,
       register an app, get `app_id` + `app_key`. General job-board aggregator,
-      widens beyond ATS-only coverage.
-- [ ] **USAJobs API key** — free. Sign up at https://developer.usajobs.gov/,
+      widens beyond ATS-only coverage. Both values are in `.env`.
+- [x] **USAJobs API key** — free. Sign up at https://developer.usajobs.gov/,
       requires an email address, get an API key. Only useful if you want US
       federal/government postings in scope — skip if not relevant to your search.
+      Key and registered email are in `.env`. That email identifies the API key
+      and nothing else — applications go through a different address.
 
 **No account needed** — dev work only, nothing for you to obtain. Each line
 below was confirmed by two independent sources (my own web search + a working
@@ -59,9 +61,14 @@ the vendors' official docs):
 
 ## Not viable, no action needed
 
-- LinkedIn — no public jobs API; scraping violates ToS and risks IP bans.
 - Google Jobs — not an API, a search surface over employers' own postings;
   nothing to integrate against directly.
+- Workday — see above. Reachable, but ruled out on terms, not on capability.
+
+LinkedIn was on this list and no longer is: `packages/pipeline/src/adapters/linkedin.ts`
+reads the keyless guest endpoints. It is the slowest adapter by a wide margin (one detail
+fetch per posting) and it is the one most likely to start refusing traffic, so treat a
+LinkedIn failure as expected rather than as a regression.
 
 ---
 

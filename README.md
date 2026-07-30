@@ -20,20 +20,30 @@ interactive Claude sessions, so extraction and scoring are batched, budgeted and
 
 ## Sources
 
+Sixteen adapters behind one `SourceAdapter` interface. The per-token ones give precision on
+companies worth watching; the keyless aggregators give breadth without more slug maintenance.
+
 | Source | API | Notes |
 | --- | --- | --- |
 | Remotive | `remotive.com/api/remote-jobs` | Structured, no key |
 | Greenhouse | `boards-api.greenhouse.io/v1/boards/{token}/jobs` | Per-token, curated seed list |
 | Lever | `api.lever.co/v0/postings/{token}` | Per-token, curated seed list |
-| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Per-slug, curated seed list; whole board in one unpaginated response |
+| Ashby | `api.ashbyhq.com/posting-api/job-board/{slug}` | Per-slug, curated seed list; whole board in one unpaginated response, behind a ~10s server-side latency floor |
+| Workable | `apply.workable.com/api/v1/widget/accounts/{slug}` | Per-slug, keyless |
+| Teamtailor | `{slug}.teamtailor.com/jobs.json` | Per-slug, keyless; the token carries its region (`lindy.na`, not `lindy`) |
 | The Muse | `themuse.com/api/public/jobs` | Keyless, paginated; broad industry mix, so most items fall out at the title filter |
 | Arbeitnow | `arbeitnow.com/api/job-board-api` | Keyless, single page; `created_at` is Unix epoch seconds, descriptions inconsistently entity-encoded |
 | Himalayas | `himalayas.app/jobs/api` | Keyless, remote-only; caps a response at 20 however large a `limit` is sent, so paging strides by the served count |
 | Jobicy | `jobicy.com/api/v2/remote-jobs` | Keyless, remote-only; flat `salaryMin`/`salaryMax` fields |
+| RemoteOK | `remoteok.com/api` | Keyless, single page; upstream serves mis-encoded UTF-8 on some non-English postings |
+| We Work Remotely | `weworkremotely.com/categories/{category}` | Keyless RSS per category |
+| LinkedIn | `linkedin.com/jobs-guest/jobs/api` | Guest endpoints, no key; by far the slowest source, one detail fetch per posting |
+| USAJobs | `data.usajobs.gov/api/search` | Free key; the registered email is sent as `User-Agent`, so both values are required |
+| Adzuna | `api.adzuna.com/v1/api/jobs/us/search` | Free key; aggregates Indeed/Glassdoor inventory |
 | HN Who's Hiring | `hn.algolia.com/api/v1` | Free-form comments, LLM-extracted and cached |
 
-The four aggregators need no per-company curation, unlike the Greenhouse/Lever/Ashby seed lists —
-they are what widens company coverage without more slug maintenance.
+USAJobs and Adzuna each skip with a message when their keys are unset; the other fourteen need
+no credential at all.
 
 ## Setup
 
@@ -58,13 +68,17 @@ bun run serve       # http://localhost:8787
 Other commands:
 
 ```bash
+bun run intel           # rank skill demand across collected postings; 0 network, 0 LLM
 bun test
 bun run typecheck
 bun run verify-boards   # probe the Greenhouse/Lever/Ashby seed tokens
 ```
 
 Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MODEL` (model for
-`claude -p`, default `claude-sonnet-5`), `SCOUT_PORT` (server port, default `8787`).
+`claude -p`, default `claude-sonnet-5`), `SCOUT_PORT` (server port, default `8787`),
+`SCOUT_HOST` (bind address, default `127.0.0.1`), `SCOUT_TRUSTED_HOSTS` (hostnames accepted
+besides loopback), `SCOUT_RUBRIC_BUDGET` (postings scored per scan, default `250`; `0` fetches
+and filters without touching the LLM stage). See `.env.example` for the rest.
 
 ## Layout
 
@@ -74,12 +88,19 @@ Environment overrides: `SCOUT_DB` (database path, default `scout.db`), `SCOUT_MO
   funnel, `claude -p` client.
 - `packages/server` — Bun HTTP API and static host for the dashboard.
 - `packages/web` — React Today view.
+- `deploy/` — Helm chart and Terraform for running the collector on GKE. See
+  [`deploy/README.md`](deploy/README.md): the interesting part is that the rubric stage
+  *cannot* be deployed, because it is bound to the operator's authenticated CLI.
 
 ## Scope
 
-This is P1: nine sources, identity resolution, the scoring funnel, and a minimal Today view.
-Market intel, the full dashboard, the tailoring engine and the automation ladder are later
-phases — see `docs/superpowers/specs/2026-07-28-agentic-job-finder-design.md`.
+Shipped: sixteen sources, identity resolution, the three-stage funnel, the Today view, the
+market-intel report, and an offline-validated Kubernetes deployment of everything except
+the LLM stage. The tailoring engine and the application-automation ladder are later phases —
+see `docs/superpowers/specs/2026-07-28-agentic-job-finder-design.md`.
+
+`docs/operators-manual.md` is the runbook: cadence, what each command costs, and how to add
+a company board that isn't in the seed list.
 
 ## Data handling
 
