@@ -1814,3 +1814,93 @@ git commit -m "Wire bun run ingest and document the profile ingestion flow"
 
 - Generated skills improve rubric context and skill-coverage *ranking* of retrieved jobs; FTS recall still keys on hand-curated `rareSkills` by design. Evidence is stored for P2B market-intel gap analysis and P3 tailoring.
 - Deferred to backlog (docs/codex-backlog.md): run-error redaction in the Runs API, HN reply-correspondence/cache-key rework, skill exclusion list, atomic cache writes.
+
+---
+
+# Addendum: Tasks 11-13 (added 2026-07-29, mid-execution)
+
+Tasks 1-10 shipped as specified above. Three tasks were added during execution: 11 in
+response to the operator noting that his strongest work lives in private and local-only
+repos, 12-13 in response to a request for operator ergonomics and a demand-driven skill
+roadmap. Detailed specs were handed to the implementers directly; this addendum is the
+phase record.
+
+## Task 11: private + local repo ingestion
+
+**Why:** the Task 7 fetcher saw 20 public repos. The account owns 79, of which 20 are
+private, and 33 more checkouts exist only on disk (29 under `~/Documents/Coding`, 4 under
+`~/Projects`). The ingested profile was therefore built from the operator's least
+representative work.
+
+**Files:** `packages/pipeline/src/ingest/token.ts` (new), `ingest/local.ts` (new),
+`ingest/github.ts`, `scripts/ingest-profile.ts`, `packages/pipeline/src/index.ts`,
+`README.md`, `CLAUDE.md`.
+
+- Token resolution: `GITHUB_TOKEN`, else `gh auth token` via an injectable runner. A
+  missing `gh` is a normal unauthenticated run, not an error. The token is never logged.
+- Authenticated listing uses `/user/repos?affiliation=owner`, paginated, so private repos
+  are included and the document set covers the whole account. An unstable document set
+  would evict still-valid extraction cache entries and re-bill the operator's LLM quota.
+- Local repos are discovered by scanning configured roots (`SCOUT_LOCAL_REPO_ROOTS`,
+  default `~/Documents/Coding` and `~/Projects`) for `.git` entries at depth 1-2, reading
+  README, manifest presence, and `package.json` dependency names. Dependency lists are the
+  highest-signal skill evidence a repo carries and cost nothing to read.
+- Local repos need no fetch cache: the extraction cache is already content-addressed, so
+  re-reading from disk each run is free and change detection is automatic.
+- **Ownership filter:** a local checkout whose git origin belongs to someone else is
+  dropped. Without this, a clone of a third-party repo becomes "demonstrated skills" in a
+  profile that drives real applications — the local-path equivalent of the GitHub path's
+  `fork !== true` filter. A repo with no remote is kept: local-only work usually has none,
+  while third-party clones almost always do.
+- Document ids are path-derived so two checkouts sharing a basename cannot collide; the
+  evidence `source` stays `local:<name>` so no absolute path reaches the profile.
+
+**Privacy:** private and local README text reaches only the local `claude` CLI and
+gitignored files under `profile/`.
+
+## Task 12: justfile + operator's manual
+
+`justfile` recipes wrapping the documented commands, and `docs/operators-manual.md` split
+into first-time setup, the daily routine, and as-needed maintenance, plus a table of what
+each command costs in network calls and LLM quota. Written last so it documents the final
+command set.
+
+## Task 13: market-intel demand ranking + skill roadmap
+
+**Why:** the operator asked which skills the roles he is looking at actually demand, and to
+work toward them deliberately. With 1,984 stored postings and a skill lexicon already in
+core, this is a counting problem — **zero LLM calls**.
+
+**Cohorts:** `market` = active postings with a non-null `title_family` (610 today, the
+target job families); `shortlist` = active postings passing the hard filters (88 today,
+what the operator can actually apply to). Gaps rank by the shortlist cohort, with the
+market cohort as context, because the two answer different questions.
+
+**Ranking unit — distinct companies, not postings.** The market cohort spans 51 companies
+but Databricks alone posts 277 of its 610 rows, and 50 of the shortlist's 88. Ranking by
+posting count would report what one company's ad copy repeats, so demand ranks by the
+number of *distinct companies* whose postings mention a skill, with posting counts shown
+as secondary detail.
+
+**Discovery:** ranking only the 39 lexicon skills would measure what we already guessed, so
+the report also surfaces high-frequency terms *absent* from the lexicon, by deterministic
+n-gram counting against a stopword list. That is what turns the report into a source of
+new information rather than a confirmation of prior assumptions.
+
+**Outputs:** `profile/market-intel.md` regenerated each run (ranked demand, have-vs-gap
+against the compiled profile, discovered terms, example postings per gap) and
+`profile/skill-roadmap.md`, which is **append-only** — `bun run intel` never clears a
+checkbox or a note the operator has written.
+
+**Reinforcing loop:** each roadmap item the operator builds gets picked up by
+`bun run ingest`, which bumps `profile.version`, which re-queues the funnel's rubric
+scoring, so match quality moves measurably as the gaps close.
+
+## Done criteria (11-13)
+
+- `bun test` and `bun run typecheck` green.
+- `bun run ingest` covers private GitHub repos and local checkouts, credits only the
+  operator's own work, and leaves no absolute paths or tokens in any artifact.
+- `just` exposes every documented command; `docs/operators-manual.md` matches reality.
+- `bun run intel` writes both reports with zero LLM calls and preserves roadmap progress
+  across runs.
