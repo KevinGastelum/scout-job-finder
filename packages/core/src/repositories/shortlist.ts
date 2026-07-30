@@ -8,6 +8,8 @@ export interface ShortlistEntry {
   job: Job;
   score: ScoreRecord;
   applicationStatus: ApplicationStatus | null;
+  // How many further locations carry this same posting. 0 for an ordinary single-location job.
+  alsoPostedIn: number;
 }
 
 export interface ShortlistOptions {
@@ -30,15 +32,30 @@ export function listShortlist(
   const profileVersion = options.profileVersion ?? null;
 
   const rows = db
-    .query<{ job_id: number }, [string, string | null, string | null, number]>(
-      `SELECT scores.job_id
-       FROM scores
-       JOIN jobs ON jobs.id = scores.job_id
-       WHERE scores.rubric_version = ?
-         AND (? IS NULL OR scores.profile_version = ?)
-         AND scores.rubric_score IS NOT NULL
-         AND jobs.status = 'active'
-       ORDER BY scores.rubric_score DESC, scores.job_id ASC
+    .query<{ job_id: number; also_posted_in: number }, [string, string | null, string | null, number]>(
+      // One role advertised in a dozen cities is a dozen rows with one identical description, and
+      // identity resolution keys on location so it cannot merge them. Ranked naively, a single
+      // employer takes a dozen of the top slots. Collapsing on the description keeps one row per
+      // actual job and reports how many locations it stood for.
+      `SELECT job_id, also_posted_in FROM (
+         SELECT scores.job_id AS job_id,
+                scores.rubric_score AS rubric_score,
+                COUNT(*) OVER (
+                  PARTITION BY jobs.company_normalized, jobs.description_hash
+                ) - 1 AS also_posted_in,
+                ROW_NUMBER() OVER (
+                  PARTITION BY jobs.company_normalized, jobs.description_hash
+                  ORDER BY scores.rubric_score DESC, scores.job_id ASC
+                ) AS rank_in_group
+         FROM scores
+         JOIN jobs ON jobs.id = scores.job_id
+         WHERE scores.rubric_version = ?
+           AND (? IS NULL OR scores.profile_version = ?)
+           AND scores.rubric_score IS NOT NULL
+           AND jobs.status = 'active'
+       )
+       WHERE rank_in_group = 1
+       ORDER BY rubric_score DESC, job_id ASC
        LIMIT ?`,
     )
     .all(rubricVersion, profileVersion, profileVersion, limit);
@@ -52,7 +69,7 @@ export function listShortlist(
     const applicationStatus = getApplication(db, row.job_id)?.status ?? null;
     if (!includeDismissed && applicationStatus === "dismissed") continue;
 
-    entries.push({ job, score, applicationStatus });
+    entries.push({ job, score, applicationStatus, alsoPostedIn: row.also_posted_in });
   }
   return entries;
 }

@@ -153,6 +153,27 @@ describe("shortlist read model", () => {
     db.close();
   });
 
+  // Measured on the live database: 1,155 scored candidates were only 1,007 distinct postings,
+  // and the duplication concentrates — one Agero role was listed in twelve states, so ranking
+  // the rows as-is handed a single job twelve of the top slots.
+  test("collapses one posting duplicated across locations", async () => {
+    const { db, ids } = await seed([
+      ["denver", 61],
+      ["austin", 61],
+      ["distinct", 55],
+    ]);
+    db.run("UPDATE jobs SET company_normalized = 'agero', description_hash = 'shared' WHERE id IN (?, ?)", [
+      ids.denver ?? 0,
+      ids.austin ?? 0,
+    ]);
+
+    const entries = listShortlist(db, RUBRIC_VERSION);
+    expect(entries.map((entry) => entry.job.sourceNativeId)).toEqual(["denver", "distinct"]);
+    expect(entries[0]?.alsoPostedIn).toBe(1);
+    expect(entries[1]?.alsoPostedIn).toBe(0);
+    db.close();
+  });
+
   test("omits expired jobs", async () => {
     const { db, ids } = await seed([["gone", 88]]);
     db.run("UPDATE jobs SET status = 'expired' WHERE id = ?", [ids.gone ?? 0]);
