@@ -36,6 +36,31 @@ describe("classifyTitleFamily", () => {
     expect(classifyTitleFamily("AI Engineer / Product Manager")).toBe("ai-engineer");
   });
 
+  test("classifies AI roles that qualify the noun instead of saying 'AI Engineer'", () => {
+    expect(classifyTitleFamily("AI Infrastructure Engineer")).toBe("ai-engineer");
+    expect(classifyTitleFamily("AI Automation Engineer")).toBe("ai-engineer");
+    expect(classifyTitleFamily("AI-Native Software Developer")).toBe("ai-engineer");
+    expect(classifyTitleFamily("AI-first QA Engineer")).toBe("ai-engineer");
+    expect(classifyTitleFamily("AI/ML Software Developer")).toBe("ai-engineer");
+    expect(classifyTitleFamily("AI Application Developer")).toBe("ai-engineer");
+    expect(classifyTitleFamily("Enterprise Application AI Architect")).toBe("ai-engineer");
+  });
+
+  // The widened rule keys off an engineering noun, not the letters "AI", because the boards
+  // are full of "AI-Native" sales and marketing titles that are not engineering work.
+  test("does not treat every AI-flavoured title as engineering", () => {
+    expect(classifyTitleFamily("Growth Account Executive, AI Native")).toBeNull();
+    expect(classifyTitleFamily("AI Strategy Consultant")).toBeNull();
+    expect(classifyTitleFamily("Associate Design Director (AI & Tech)")).toBeNull();
+    expect(classifyTitleFamily("AI Transformation Owner, CRO")).toBeNull();
+  });
+
+  // A qualifier between "AI" and the noun must not let a more specific family be skipped.
+  test("keeps the specific families ahead of the widened AI rule", () => {
+    expect(classifyTitleFamily("AI Agents Infrastructure Engineer")).toBe("agentic-engineer");
+    expect(classifyTitleFamily("AI Forward Deployed Engineer")).toBe("forward-deployed-engineer");
+  });
+
   test("every family has retrieval query terms", () => {
     expect(Object.keys(TITLE_FAMILY_QUERY_TERMS)).toContain("agentic-engineer");
     expect(TITLE_FAMILY_QUERY_TERMS["agentic-engineer"].length).toBeGreaterThan(0);

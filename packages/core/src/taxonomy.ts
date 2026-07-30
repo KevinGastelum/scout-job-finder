@@ -24,7 +24,18 @@ const FAMILY_RULES: FamilyRule[] = [
   },
   {
     family: "ai-engineer",
-    patterns: [/\bai\s+engineer\b/, /\bapplied\s+ai\b/, /\bgenerative\s+ai\b/, /\bgenai\b/],
+    patterns: [
+      /\bai\s+engineer\b/,
+      /\bapplied\s+ai\b/,
+      /\bgenerative\s+ai\b/,
+      /\bgenai\b/,
+      // Boards overwhelmingly qualify the noun — "AI Infrastructure Engineer", "AI-Native
+      // Software Developer" — so requiring the bare phrase "AI engineer" dropped these before
+      // they could be scored. Anchoring on the engineering noun rather than on "AI" is what
+      // keeps "AI-Native" sales and marketing titles out.
+      /\bai[\s/-](?:[\w-]+\s+){0,2}(?:engineer|developer|architect)\b/,
+      /\bai\s+architect\b/,
+    ],
   },
   {
     family: "ml-engineer",
