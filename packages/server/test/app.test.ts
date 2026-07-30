@@ -231,12 +231,83 @@ describe("server app", () => {
     db.close();
   });
 
+  test("POST /api/jobs/:id/status rejects a non-object body", async () => {
+    const { db, jobId } = await seed();
+    const response = await appFor(db)(
+      new Request(`http://localhost/api/jobs/${jobId}/status`, { method: "POST", body: "null" }),
+    );
+    expect(response.status).toBe(400);
+    db.close();
+  });
+
+  test("GET /api/shortlist ignores a nonsense limit", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    for (const limit of ["-5", "1.5", "abc", "1e100", "9007199254740993"]) {
+      const response = await app(new Request(`http://localhost/api/shortlist?limit=${limit}`));
+      expect(response.status).toBe(200);
+      expect(((await response.json()) as { entries: unknown[] }).entries.length).toBe(1);
+    }
+    db.close();
+  });
+
   test("wrong methods are rejected", async () => {
     const { db } = await seed();
     const response = await appFor(db)(
       new Request("http://localhost/api/shortlist", { method: "DELETE" }),
     );
     expect(response.status).toBe(405);
+    db.close();
+  });
+});
+
+describe("host guard", () => {
+  // Bun.serve derives request.url from the Host header, so a non-loopback URL here is exactly
+  // what a DNS-rebinding victim's browser produces.
+  test("rejects a rebound host even when the origin matches it", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    const post = await app(
+      new Request("http://evil.example/api/run", {
+        method: "POST",
+        headers: { origin: "http://evil.example" },
+      }),
+    );
+    expect(post.status).toBe(403);
+    expect(((await post.json()) as { error: string }).error).toBe("host not allowed");
+    db.close();
+  });
+
+  test("rejects reads from a rebound host so the shortlist cannot be exfiltrated", async () => {
+    const { db } = await seed();
+    const response = await appFor(db)(new Request("http://evil.example/api/shortlist"));
+    expect(response.status).toBe(403);
+    db.close();
+  });
+
+  // A string split on the first colon reads "localhost" here; a URL parser reads userinfo plus a
+  // host of evil.example. The guard must agree with the URL parser.
+  test("rejects a loopback name smuggled into the userinfo position", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    for (const authority of ["localhost:8787@evil.example", "localhost@evil.example:8787"]) {
+      const response = await app(new Request(`http://${authority}/api/shortlist`));
+      expect(response.status).toBe(403);
+    }
+    db.close();
+  });
+
+  test("allows loopback hosts", async () => {
+    const { db } = await seed();
+    const app = appFor(db);
+
+    for (const origin of ["http://localhost:8787", "http://127.0.0.1:8787", "http://[::1]:8787"]) {
+      const response = await app(new Request(`${origin}/api/shortlist`));
+      expect(response.status).toBe(200);
+    }
     db.close();
   });
 });

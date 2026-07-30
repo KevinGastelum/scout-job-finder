@@ -37,6 +37,23 @@ describe("resolveGithubToken", () => {
     expect(token).toBeNull();
   });
 
+  test("a token with an embedded newline is rejected rather than spliced into a header", async () => {
+    const injected = "ghp_abc\r\nx-injected: 1";
+    expect(await resolveGithubToken({ GITHUB_TOKEN: injected }, async () => null)).toBeNull();
+    expect(await resolveGithubToken({}, async () => injected)).toBeNull();
+  });
+
+  test("a token with interior whitespace or control characters is rejected", async () => {
+    for (const bad of ["ghp_a bc", "ghp_a\tbc", "ghp_a\0bc"]) {
+      expect(await resolveGithubToken({}, async () => bad)).toBeNull();
+    }
+  });
+
+  test("an unusable env token still falls through to the runner", async () => {
+    const token = await resolveGithubToken({ GITHUB_TOKEN: "bad\ntoken" }, async () => "gho_ok");
+    expect(token).toBe("gho_ok");
+  });
+
   test("an auth header secret never leaks into a thrown HttpError's message or stack", async () => {
     const secret = "ghp_super_secret_do_not_log_1234567890";
     const client = createHttpClient({

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -104,6 +104,16 @@ describe("scanLocalRepos", () => {
   test("readme is null when no README variant exists", async () => {
     const root = tempRoot();
     await makeGitDirRepo(join(root, "repo-a"));
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.readme).toBeNull();
+  });
+
+  test("a directory named README.md is not treated as a readme", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath);
+    await Bun.write(join(repoPath, "README.md", "inner.txt"), "not the readme");
 
     const [repo] = await scanLocalRepos([root]);
     expect(repo?.readme).toBeNull();
@@ -308,6 +318,71 @@ describe("scanLocalRepos", () => {
 
     const repos = await scanLocalRepos([filePath]);
     expect(repos).toEqual([]);
+  });
+});
+
+// Creating a file symlink on Windows needs Developer Mode or elevation, so these skip on an
+// unprivileged Windows box. They are the only coverage of the containment branch — if you touch
+// containedFile in src/ingest/local.ts, run this file somewhere symlinks work.
+const CAN_SYMLINK = ((): boolean => {
+  const probe = mkdtempSync(join(tmpdir(), "scout-symlink-probe-"));
+  try {
+    writeFileSync(join(probe, "target.txt"), "x");
+    symlinkSync(join(probe, "target.txt"), join(probe, "link.txt"));
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+describe.skipIf(!CAN_SYMLINK)("readme symlink containment", () => {
+  test("a README symlinked outside the repo is skipped, not read", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath);
+    const secret = join(root, "outside", "id_rsa");
+    await Bun.write(secret, "-----BEGIN OPENSSH PRIVATE KEY-----");
+    symlinkSync(secret, join(repoPath, "README.md"));
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.readme).toBeNull();
+  });
+
+  test("an escaping README.md does not shadow a legitimate README.txt", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath);
+    const secret = join(root, "outside", "id_rsa");
+    await Bun.write(secret, "-----BEGIN OPENSSH PRIVATE KEY-----");
+    symlinkSync(secret, join(repoPath, "README.md"));
+    await Bun.write(join(repoPath, "README.txt"), "the real readme");
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.readme).toBe("the real readme");
+  });
+
+  test("a README symlinked within the repo is still read", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath);
+    await Bun.write(join(repoPath, "docs", "overview.md"), "in-repo readme target");
+    symlinkSync(join(repoPath, "docs", "overview.md"), join(repoPath, "README.md"));
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.readme).toBe("in-repo readme target");
+  });
+
+  test("an escaping package.json is neither listed as a manifest nor parsed for deps", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath);
+    const outside = join(root, "outside", "package.json");
+    await Bun.write(outside, JSON.stringify({ dependencies: { leaked: "1.0.0" } }));
+    symlinkSync(outside, join(repoPath, "package.json"));
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.manifests).toEqual([]);
+    expect(repo?.deps).toEqual([]);
   });
 });
 

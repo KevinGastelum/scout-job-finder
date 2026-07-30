@@ -7,3 +7,4 @@ dist/
 .env.*
 profile/*
 !profile/profile.template.md
+.tmp/

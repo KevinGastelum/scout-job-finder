@@ -186,7 +186,11 @@ export class ClaudeCliClient implements LlmClient {
         return schema.parse(JSON.parse(extractJsonObject(text)));
       } catch (error) {
         lastMessage = error instanceof Error ? error.message : String(error);
-        attemptPrompt = `${base}\n\nYour previous reply could not be used: ${lastMessage}\nReturn only the corrected JSON object.`;
+        // The parse error quotes the model's own reply, and a hostile posting can steer what
+        // the model emits. Reflecting it would splice attacker-influenced text into the retry
+        // prompt as prose — outside the JSON envelope every caller relies on. Keep the retry
+        // instruction static; lastMessage is for the thrown error only, which never reaches a model.
+        attemptPrompt = `${base}\n\nYour previous reply was not a single valid JSON object matching the requested shape. Return only the corrected JSON object.`;
       }
     }
 

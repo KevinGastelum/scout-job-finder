@@ -12,18 +12,27 @@ async function spawnCommand(cmd: string, args: string[]): Promise<string | null>
   }
 }
 
+// Printable ASCII, no space. `trim()` alone leaves interior control characters, and a token
+// carrying CR/LF would either split the Authorization header or make fetch throw a validation
+// error whose message quotes the header value — leaking the token into a log.
+const HEADER_SAFE = /^[\x21-\x7e]+$/;
+
+function usableToken(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  return HEADER_SAFE.test(trimmed) ? trimmed : null;
+}
+
 export async function resolveGithubToken(
   env: Record<string, string | undefined> = process.env,
   runner: CommandRunner = spawnCommand,
 ): Promise<string | null> {
-  const fromEnv = env.GITHUB_TOKEN?.trim() ?? "";
-  if (fromEnv.length > 0) return fromEnv;
+  const fromEnv = usableToken(env.GITHUB_TOKEN ?? "");
+  if (fromEnv !== null) return fromEnv;
 
   try {
     const fromRunner = await runner("gh", ["auth", "token"]);
-    if (fromRunner === null) return null;
-    const trimmed = fromRunner.trim();
-    return trimmed.length > 0 ? trimmed : null;
+    return fromRunner === null ? null : usableToken(fromRunner);
   } catch {
     return null;
   }

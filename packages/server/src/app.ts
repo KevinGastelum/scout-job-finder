@@ -18,6 +18,7 @@ export interface AppDeps {
 export type AppHandler = (request: Request) => Promise<Response>;
 
 const STATUS_ROUTE = /^\/api\/jobs\/(\d+)\/status$/;
+const MAX_SHORTLIST_LIMIT = 500;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -30,6 +31,25 @@ function isApplicationStatus(value: unknown): value is ApplicationStatus {
   return (
     typeof value === "string" && (APPLICATION_STATUSES as readonly string[]).includes(value)
   );
+}
+
+// The same-origin check below is not sufficient on its own: this server has no auth, so an
+// attacker who points evil.example at 127.0.0.1 (DNS rebinding) gets a page whose requests
+// carry Origin === Host === evil.example and pass it. Pinning the host to loopback closes that.
+// Applies to GET too — /api/shortlist returns personal job-search data.
+//
+// Bun.serve derives request.url from the Host header, so the URL is the authority. Parsing the
+// raw header instead would be strictly worse: `localhost:8787@evil.example` is userinfo plus a
+// host of evil.example to a URL parser, but everything-before-the-first-colon to a string split.
+function hostAllowed(request: Request): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(request.url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (hostname === "localhost" || hostname === "[::1]") return true;
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
 }
 
 function originAllowed(request: Request): boolean {
@@ -50,6 +70,10 @@ export function createApp(deps: AppDeps): AppHandler {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    if (!hostAllowed(request)) {
+      return json({ error: "host not allowed" }, 403);
+    }
+
     if (request.method !== "GET" && !originAllowed(request)) {
       return json({ error: "cross-origin request rejected" }, 403);
     }
@@ -57,9 +81,14 @@ export function createApp(deps: AppDeps): AppHandler {
     if (path === "/api/shortlist") {
       if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
       const limitParam = url.searchParams.get("limit");
-      const limit = limitParam === null ? undefined : Number(limitParam);
+      const limit = limitParam === null ? Number.NaN : Number(limitParam);
       const entries = listShortlist(deps.db, deps.rubricVersion, {
-        limit: limit !== undefined && Number.isFinite(limit) ? limit : undefined,
+        // SQLite's LIMIT rejects a value it cannot losslessly bind as an integer, so
+        // Number.isSafeInteger matters here, not just Number.isInteger (true for 1e100).
+        limit:
+          Number.isSafeInteger(limit) && limit > 0
+            ? Math.min(limit, MAX_SHORTLIST_LIMIT)
+            : undefined,
         includeDismissed: url.searchParams.get("includeDismissed") === "1",
       });
       return json({ entries });
@@ -96,6 +125,10 @@ export function createApp(deps: AppDeps): AppHandler {
         payload = await request.json();
       } catch {
         return json({ error: "body must be JSON" }, 400);
+      }
+
+      if (typeof payload !== "object" || payload === null) {
+        return json({ error: "body must be a JSON object" }, 400);
       }
 
       const status = (payload as { status?: unknown }).status;

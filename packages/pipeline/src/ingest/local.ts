@@ -1,5 +1,5 @@
-import { readdir, stat } from "node:fs/promises";
-import { basename, isAbsolute, join } from "node:path";
+import { lstat, readdir, realpath, stat } from "node:fs/promises";
+import { basename, isAbsolute, join, sep } from "node:path";
 import { MAX_README_CHARS } from "./constants";
 
 export const MAX_LOCAL_DEPS = 40;
@@ -59,12 +59,30 @@ async function gitEntryKind(dirPath: string): Promise<"dir" | "file" | null> {
   }
 }
 
+// These roots hold repos Kevin merely cloned, so their contents are untrusted: a hostile repo
+// could ship `README.md` as a symlink to ~/.ssh/id_rsa and this reader would hand the key to the
+// LLM and quote it into profile/generated.json. Resolve the real path and require it to stay
+// inside the repo, which still allows the common in-repo symlink (README.md -> docs/README.md).
+async function containedFile(dirPath: string, candidate: string): Promise<string | null> {
+  const target = join(dirPath, candidate);
+  try {
+    const link = await lstat(target);
+    if (!link.isSymbolicLink()) return link.isFile() ? target : null;
+
+    const [real, root] = await Promise.all([realpath(target), realpath(dirPath)]);
+    if (real !== root && !real.startsWith(`${root}${sep}`)) return null;
+    return (await stat(real)).isFile() ? real : null;
+  } catch {
+    return null;
+  }
+}
+
 async function readFirstReadme(dirPath: string): Promise<string | null> {
   for (const candidate of README_CANDIDATES) {
     try {
-      const file = Bun.file(join(dirPath, candidate));
-      if (!(await file.exists())) continue;
-      const text = (await file.slice(0, MAX_README_CHARS * 4).text()).trim();
+      const safePath = await containedFile(dirPath, candidate);
+      if (safePath === null) continue;
+      const text = (await Bun.file(safePath).slice(0, MAX_README_CHARS * 4).text()).trim();
       if (text.length === 0) continue;
       return text.slice(0, MAX_README_CHARS);
     } catch {
@@ -78,7 +96,7 @@ async function detectManifests(dirPath: string): Promise<string[]> {
   const found: string[] = [];
   for (const candidate of MANIFEST_CANDIDATES) {
     try {
-      if (await Bun.file(join(dirPath, candidate)).exists()) found.push(candidate);
+      if ((await containedFile(dirPath, candidate)) !== null) found.push(candidate);
     } catch {
       continue;
     }
@@ -97,7 +115,9 @@ function depNames(record: Record<string, unknown>, field: string): string[] {
 async function readDeps(dirPath: string, manifests: string[]): Promise<string[]> {
   if (!manifests.includes("package.json")) return [];
   try {
-    const parsed: unknown = await Bun.file(join(dirPath, "package.json")).json();
+    const safePath = await containedFile(dirPath, "package.json");
+    if (safePath === null) return [];
+    const parsed: unknown = await Bun.file(safePath).json();
     if (typeof parsed !== "object" || parsed === null) return [];
     const record = parsed as Record<string, unknown>;
     const ordered: string[] = [];
