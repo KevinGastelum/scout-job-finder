@@ -35,4 +35,29 @@ describe("resolveGithubToken", () => {
     });
     expect(token).toBeNull();
   });
+
+  test("the resolved token never appears in console output", async () => {
+    const secret = "ghp_super_secret_do_not_log_1234567890";
+    const captured: unknown[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    console.log = (...args: unknown[]) => captured.push(args);
+    console.error = (...args: unknown[]) => captured.push(args);
+    console.warn = (...args: unknown[]) => captured.push(args);
+
+    try {
+      const fromEnv = await resolveGithubToken({ GITHUB_TOKEN: secret }, async () => null);
+      const fromRunner = await resolveGithubToken({}, async () => secret);
+      expect(fromEnv).toBe(secret);
+      expect(fromRunner).toBe(secret);
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+      console.warn = originalWarn;
+    }
+
+    const serialized = JSON.stringify(captured);
+    expect(serialized).not.toContain(secret);
+  });
 });

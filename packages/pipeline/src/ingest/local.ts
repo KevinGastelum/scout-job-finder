@@ -1,7 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
+import { MAX_README_CHARS } from "./constants";
 
-export const MAX_LOCAL_README_CHARS = 8_000;
 export const MAX_LOCAL_DEPS = 40;
 
 export interface LocalRepo {
@@ -13,7 +13,9 @@ export interface LocalRepo {
   deps: string[];
 }
 
-const README_CANDIDATES = ["README.md", "readme.md", "README.markdown", "README.txt", "README"];
+// "readme.md" is omitted: on a case-insensitive filesystem (Windows, default
+// macOS) it can never be a distinct file from "README.md", so it's dead.
+const README_CANDIDATES = ["README.md", "README.markdown", "README.txt", "README"];
 const MANIFEST_CANDIDATES = [
   "package.json",
   "pyproject.toml",
@@ -23,22 +25,26 @@ const MANIFEST_CANDIDATES = [
   "deno.json",
   "bun.lock",
 ];
-const GIT_REMOTE_PATTERNS = [
-  /^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/,
-  /^https:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/,
-];
+const TYPES_SCOPE_PREFIX = "@types/";
+
+function expandTilde(root: string, home: string): string {
+  if (root === "~") return home;
+  if (root.startsWith("~/") || root.startsWith("~\\")) return join(home, root.slice(2));
+  return root;
+}
 
 export function defaultLocalRoots(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
+  const home = env.USERPROFILE ?? env.HOME ?? ".";
   const override = env.SCOUT_LOCAL_REPO_ROOTS;
   if (override !== undefined) {
     return override
       .split(",")
       .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
+      .filter((entry) => entry.length > 0)
+      .map((entry) => expandTilde(entry, home));
   }
-  const home = env.USERPROFILE ?? env.HOME ?? ".";
   return [join(home, "Documents", "Coding"), join(home, "Projects")];
 }
 
@@ -58,9 +64,9 @@ async function readFirstReadme(dirPath: string): Promise<string | null> {
     try {
       const file = Bun.file(join(dirPath, candidate));
       if (!(await file.exists())) continue;
-      const text = (await file.text()).trim();
+      const text = (await file.slice(0, MAX_README_CHARS * 4).text()).trim();
       if (text.length === 0) continue;
-      return text.slice(0, MAX_LOCAL_README_CHARS);
+      return text.slice(0, MAX_README_CHARS);
     } catch {
       continue;
     }
@@ -80,34 +86,48 @@ async function detectManifests(dirPath: string): Promise<string[]> {
   return found;
 }
 
+function depNames(record: Record<string, unknown>, field: string): string[] {
+  const value = record[field];
+  if (typeof value !== "object" || value === null) return [];
+  return Object.keys(value)
+    .filter((name) => !name.startsWith(TYPES_SCOPE_PREFIX))
+    .sort();
+}
+
 async function readDeps(dirPath: string, manifests: string[]): Promise<string[]> {
   if (!manifests.includes("package.json")) return [];
   try {
     const parsed: unknown = await Bun.file(join(dirPath, "package.json")).json();
     if (typeof parsed !== "object" || parsed === null) return [];
     const record = parsed as Record<string, unknown>;
-    const names = new Set<string>();
-    for (const field of ["dependencies", "devDependencies"]) {
-      const value = record[field];
-      if (typeof value === "object" && value !== null) {
-        for (const key of Object.keys(value)) names.add(key);
-      }
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+    for (const name of [...depNames(record, "dependencies"), ...depNames(record, "devDependencies")]) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      ordered.push(name);
+      if (ordered.length === MAX_LOCAL_DEPS) break;
     }
-    return [...names].sort().slice(0, MAX_LOCAL_DEPS);
+    return ordered;
   } catch {
     return [];
   }
 }
 
+function stripInlineComment(line: string): string {
+  const match = /^([^#;]*)[#;]/.exec(line);
+  return (match !== null ? match[1] : line).trim();
+}
+
 function extractOriginUrl(config: string): string | null {
   let inOrigin = false;
   for (const rawLine of config.split(/\r?\n/)) {
-    const line = rawLine.trim();
+    const line = stripInlineComment(rawLine.trim());
     if (line.startsWith("[")) {
-      inOrigin = /^\[remote\s+"origin"\]$/.test(line);
+      inOrigin = /^\[remote\s+"origin"\]$/i.test(line);
       continue;
     }
-    if (inOrigin && line.startsWith("url")) {
+    if (inOrigin && /^url\s*=/.test(line)) {
       const eq = line.indexOf("=");
       if (eq === -1) continue;
       return line.slice(eq + 1).trim();
@@ -116,20 +136,60 @@ function extractOriginUrl(config: string): string | null {
   return null;
 }
 
-async function parseRemote(dirPath: string): Promise<string | null> {
+function parseGithubOwnerName(url: string): string | null {
+  const shorthand = /^git@github\.com:(.+)$/i.exec(url);
+  const remainder = shorthand !== null ? shorthand[1] : null;
+
+  let path: string | null = remainder;
+  if (path === null) {
+    const schemeForm = /^(?:ssh|https?):\/\/(?:[^@/]+@)?github\.com[:/](.+)$/i.exec(url);
+    if (schemeForm === null) return null;
+    path = schemeForm[1];
+  }
+
+  const cleaned = path.replace(/\.git\/?$/i, "").replace(/\/+$/, "");
+  const match = /^([^/]+)\/([^/]+)$/.exec(cleaned);
+  return match !== null ? `${match[1]}/${match[2]}` : null;
+}
+
+async function resolveWorktreeConfigPath(dirPath: string): Promise<string | null> {
+  let gitFileText: string;
+  try {
+    gitFileText = await Bun.file(join(dirPath, ".git")).text();
+  } catch {
+    return null;
+  }
+  const match = /gitdir:\s*(.+)/i.exec(gitFileText);
+  if (match === null) return null;
+  const gitdirRaw = match[1].trim();
+  if (gitdirRaw.length === 0) return null;
+  const gitdir = isAbsolute(gitdirRaw) ? gitdirRaw : join(dirPath, gitdirRaw);
+
+  let commondir = gitdir;
+  try {
+    const commondirRaw = (await Bun.file(join(gitdir, "commondir")).text()).trim();
+    if (commondirRaw.length > 0) {
+      commondir = isAbsolute(commondirRaw) ? commondirRaw : join(gitdir, commondirRaw);
+    }
+  } catch {
+    // no commondir file (e.g. a submodule) — the gitdir itself holds config
+  }
+  return join(commondir, "config");
+}
+
+async function parseRemote(dirPath: string, gitKind: "dir" | "file"): Promise<string | null> {
+  const configPath =
+    gitKind === "dir" ? join(dirPath, ".git", "config") : await resolveWorktreeConfigPath(dirPath);
+  if (configPath === null) return null;
+
   let config: string;
   try {
-    config = await Bun.file(join(dirPath, ".git", "config")).text();
+    config = await Bun.file(configPath).text();
   } catch {
     return null;
   }
   const url = extractOriginUrl(config);
-  if (url === null) return null;
-  for (const pattern of GIT_REMOTE_PATTERNS) {
-    const match = pattern.exec(url);
-    if (match !== null) return `${match[1]}/${match[2]}`;
-  }
-  return null;
+  return url === null ? null : parseGithubOwnerName(url);
 }
 
 async function tryBuildRepo(dirPath: string): Promise<LocalRepo | null> {
@@ -139,7 +199,7 @@ async function tryBuildRepo(dirPath: string): Promise<LocalRepo | null> {
   const readme = await readFirstReadme(dirPath);
   const manifests = await detectManifests(dirPath);
   const deps = await readDeps(dirPath, manifests);
-  const remote = gitKind === "dir" ? await parseRemote(dirPath) : null;
+  const remote = await parseRemote(dirPath, gitKind);
 
   return { name: basename(dirPath), path: dirPath, remote, readme, manifests, deps };
 }
@@ -173,12 +233,28 @@ export async function scanLocalRepos(roots: string[]): Promise<LocalRepo[]> {
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function localReposNotOnGithub(local: LocalRepo[], githubNames: string[]): LocalRepo[] {
+export type LocalRepoDisposition = "keep" | "duplicate" | "foreign";
+
+export function classifyLocalRepo(
+  repo: LocalRepo,
+  githubNames: Set<string>,
+  owners: Set<string>,
+): LocalRepoDisposition {
+  if (githubNames.has(repo.name.toLowerCase())) return "duplicate";
+  const remoteName = repo.remote?.split("/")[1]?.toLowerCase();
+  if (remoteName !== undefined && githubNames.has(remoteName)) return "duplicate";
+  if (repo.remote !== null) {
+    const owner = repo.remote.split("/")[0]?.toLowerCase();
+    if (owner !== undefined && !owners.has(owner)) return "foreign";
+  }
+  return "keep";
+}
+
+export function localReposToIngest(
+  local: LocalRepo[],
+  githubNames: string[],
+  owners: Set<string>,
+): LocalRepo[] {
   const known = new Set(githubNames.map((name) => name.toLowerCase()));
-  return local.filter((repo) => {
-    if (known.has(repo.name.toLowerCase())) return false;
-    const remoteName = repo.remote?.split("/")[1]?.toLowerCase();
-    if (remoteName !== undefined && known.has(remoteName)) return false;
-    return true;
-  });
+  return local.filter((repo) => classifyLocalRepo(repo, known, owners) === "keep");
 }

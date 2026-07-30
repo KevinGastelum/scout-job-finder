@@ -1,12 +1,17 @@
 import { HttpError, type HttpClient } from "../http";
+import { MAX_README_CHARS } from "./constants";
 
 export const GITHUB_API = "https://api.github.com";
 export const MAX_REPOS = 20;
-export const MAX_REPOS_AUTHENTICATED = 60;
-export const MAX_README_CHARS = 8_000;
+export const MAX_REPOS_AUTHENTICATED = 120;
+export { MAX_README_CHARS };
+
+const LISTING_PAGE_SIZE = 100;
+const MAX_LISTING_PAGES = 3;
 
 export interface GithubRepo {
   name: string;
+  owner: string;
   description: string | null;
   url: string;
   language: string | null;
@@ -33,7 +38,6 @@ interface RepoListItem {
   fork?: boolean;
   owner?: { login?: string };
   private?: boolean;
-  size?: number;
 }
 
 interface ReadmeReply {
@@ -74,6 +78,27 @@ async function readCachedFetch(path: string): Promise<CachedFetch | null> {
   }
 }
 
+async function fetchListing(
+  http: HttpClient,
+  user: string,
+  authenticated: boolean,
+): Promise<RepoListItem[]> {
+  if (!authenticated) {
+    return await http.getJson<RepoListItem[]>(
+      `${GITHUB_API}/users/${user}/repos?per_page=${LISTING_PAGE_SIZE}&sort=pushed`,
+    );
+  }
+  const all: RepoListItem[] = [];
+  for (let page = 1; page <= MAX_LISTING_PAGES; page += 1) {
+    const pageItems = await http.getJson<RepoListItem[]>(
+      `${GITHUB_API}/user/repos?affiliation=owner&per_page=${LISTING_PAGE_SIZE}&sort=pushed&page=${page}`,
+    );
+    all.push(...pageItems);
+    if (pageItems.length < LISTING_PAGE_SIZE) break;
+  }
+  return all;
+}
+
 export async function fetchGithubRepos(
   http: HttpClient,
   user: string,
@@ -81,13 +106,10 @@ export async function fetchGithubRepos(
   options: FetchGithubReposOptions = {},
 ): Promise<GithubRepo[]> {
   const authenticated = options.authenticated === true;
-  const listingUrl = authenticated
-    ? `${GITHUB_API}/user/repos?affiliation=owner&per_page=100&sort=pushed`
-    : `${GITHUB_API}/users/${user}/repos?per_page=100&sort=pushed`;
 
   let listing: RepoListItem[];
   try {
-    listing = await http.getJson<RepoListItem[]>(listingUrl);
+    listing = await fetchListing(http, user, authenticated);
   } catch (error) {
     if (rateLimited(error)) throw rateLimitError(authenticated, error);
     throw error;
@@ -96,10 +118,7 @@ export async function fetchGithubRepos(
   const candidates = listing
     .filter(
       (item): item is RepoListItem & { name: string; pushed_at: string } =>
-        item.fork !== true &&
-        item.size !== 0 &&
-        typeof item.name === "string" &&
-        typeof item.pushed_at === "string",
+        item.fork !== true && typeof item.name === "string" && typeof item.pushed_at === "string",
     )
     .slice(0, authenticated ? MAX_REPOS_AUTHENTICATED : MAX_REPOS);
 
@@ -134,8 +153,11 @@ export async function fetchGithubRepos(
       }
     }
 
+    if (fetched.languages.length === 0 && fetched.readme === null) continue;
+
     repos.push({
       name: item.name,
+      owner,
       description: item.description ?? null,
       url: item.html_url ?? `https://github.com/${owner}/${item.name}`,
       language: item.language ?? null,

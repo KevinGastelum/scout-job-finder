@@ -55,7 +55,9 @@ function routesFor(listing: unknown): Record<string, unknown> {
       content: Buffer.from("# Warren\nSandboxed agent control plane").toString("base64"),
       encoding: "base64",
     },
-    "https://api.github.com/repos/kev/quiet/languages": {},
+    // non-empty so "quiet" survives the has-some-content filter while still
+    // demonstrating the no-readme case
+    "https://api.github.com/repos/kev/quiet/languages": { Python: 10 },
   };
 }
 
@@ -67,6 +69,7 @@ describe("fetchGithubRepos", () => {
   test("fetches non-fork repos with decoded readmes", async () => {
     const repos = await fetchGithubRepos(fakeHttp(routesFor(LISTING)), "kev", tempCacheDir());
     expect(repos.map((repo) => repo.name)).toEqual(["warren", "quiet"]);
+    expect(repos[0]?.owner).toBe("kev");
     expect(repos[0]?.readme).toContain("Sandboxed agent control plane");
     expect(repos[0]?.languages).toEqual(["TypeScript", "Shell"]);
     expect(repos[1]?.readme).toBeNull();
@@ -163,58 +166,140 @@ describe("fetchGithubRepos", () => {
       "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": listing,
     };
     for (const item of listing) {
-      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = {};
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = { JavaScript: 1 };
     }
     const repos = await fetchGithubRepos(fakeHttp(routes), "kev", tempCacheDir());
     expect(repos.length).toBe(MAX_REPOS);
   });
-});
 
-describe("fetchGithubRepos authenticated", () => {
-  test("lists /user/repos?affiliation=owner and caps at MAX_REPOS_AUTHENTICATED", async () => {
-    const listing = Array.from({ length: 70 }, (_, index) => ({
-      name: `repo-${index}`,
-      owner: { login: "kev" },
+  test("unauthenticated path makes exactly one listing request and caps at MAX_REPOS", async () => {
+    const listing = Array.from({ length: 25 }, (_, index) => ({
+      name: `unauth-repo-${index}`,
       description: null,
-      html_url: `https://github.com/kev/repo-${index}`,
+      html_url: `https://github.com/kev/unauth-repo-${index}`,
       language: null,
       topics: [],
       stargazers_count: 0,
       pushed_at: `2026-07-${String((index % 28) + 1).padStart(2, "0")}T00:00:00Z`,
       fork: false,
-      private: false,
     }));
     const routes: Record<string, unknown> = {
-      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed": listing,
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": listing,
     };
     for (const item of listing) {
-      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = {};
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = { JavaScript: 1 };
+    }
+    const http = fakeHttp(routes);
+    const repos = await fetchGithubRepos(http, "kev", tempCacheDir());
+    expect(repos.length).toBe(MAX_REPOS);
+    expect(
+      http.calls.filter((url) => url === "https://api.github.com/users/kev/repos?per_page=100&sort=pushed")
+        .length,
+    ).toBe(1);
+  });
+
+  test("skips a repo with no languages and no readme, but still caches it", async () => {
+    const cacheDir = tempCacheDir();
+    const emptyListing = [
+      {
+        name: "empty-repo",
+        description: null,
+        html_url: "https://github.com/kev/empty-repo",
+        language: null,
+        topics: [],
+        stargazers_count: 0,
+        pushed_at: "2026-05-15T00:00:00Z",
+        fork: false,
+      },
+    ];
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": emptyListing,
+      "https://api.github.com/repos/kev/empty-repo/languages": {},
+    };
+    const repos = await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
+    expect(repos).toEqual([]);
+    expect(await Bun.file(join(cacheDir, "kev--empty-repo.json")).exists()).toBe(true);
+  });
+});
+
+describe("fetchGithubRepos authenticated", () => {
+  function authenticatedItem(name: string, pushedAt: string): Record<string, unknown> {
+    return {
+      name,
+      owner: { login: "kev" },
+      description: null,
+      html_url: `https://github.com/kev/${name}`,
+      language: null,
+      topics: [],
+      stargazers_count: 0,
+      pushed_at: pushedAt,
+      fork: false,
+      private: false,
+    };
+  }
+
+  test("lists /user/repos?affiliation=owner with page=1 and caps at MAX_REPOS_AUTHENTICATED", async () => {
+    const listing = Array.from({ length: 70 }, (_, index) =>
+      authenticatedItem(`repo-${index}`, `2026-07-${String((index % 28) + 1).padStart(2, "0")}T00:00:00Z`),
+    );
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1": listing,
+    };
+    for (const item of listing) {
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = { JavaScript: 1 };
     }
     const http = fakeHttp(routes);
     const repos = await fetchGithubRepos(http, "kev", tempCacheDir(), { authenticated: true });
-    expect(repos.length).toBe(MAX_REPOS_AUTHENTICATED);
+    expect(repos.length).toBe(70);
     expect(http.calls[0]).toBe(
-      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed",
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1",
     );
   });
 
-  test("unauthenticated run still requests /users/{user}/repos and caps at MAX_REPOS", async () => {
-    const http = fakeHttp(routesFor(LISTING));
-    await fetchGithubRepos(http, "kev", tempCacheDir());
-    expect(http.calls[0]).toBe("https://api.github.com/users/kev/repos?per_page=100&sort=pushed");
+  test("stops paginating once a page comes back short, and includes that page's repos", async () => {
+    const page1 = Array.from({ length: 100 }, (_, index) =>
+      authenticatedItem(`page1-${index}`, "2026-07-01T00:00:00Z"),
+    );
+    const page2 = Array.from({ length: 10 }, (_, index) =>
+      authenticatedItem(`page2-${index}`, "2026-07-01T00:00:00Z"),
+    );
+    const routes: Record<string, unknown> = {
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1": page1,
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=2": page2,
+    };
+    for (const item of [...page1, ...page2]) {
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = { JavaScript: 1 };
+    }
+    const http = fakeHttp(routes);
+    const repos = await fetchGithubRepos(http, "kev", tempCacheDir(), { authenticated: true });
+
+    const listingCalls = http.calls.filter((url) => url.startsWith("https://api.github.com/user/repos"));
+    expect(listingCalls).toEqual([
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1",
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=2",
+    ]);
+    expect(repos.map((repo) => repo.name)).toContain("page2-0");
+    expect(repos.length).toBe(110);
   });
 
-  test("drops size: 0 items from the listing", async () => {
-    const listingWithEmpty = [
-      ...LISTING,
-      { name: "empty-repo", pushed_at: "2026-05-15T00:00:00Z", fork: false, size: 0 },
-    ];
-    const repos = await fetchGithubRepos(
-      fakeHttp(routesFor(listingWithEmpty)),
-      "kev",
-      tempCacheDir(),
+  test("stops after 3 pages even when every page is full, and caps at MAX_REPOS_AUTHENTICATED", async () => {
+    const pages = [1, 2, 3].map((page) =>
+      Array.from({ length: 100 }, (_, index) => authenticatedItem(`p${page}-${index}`, "2026-07-01T00:00:00Z")),
     );
-    expect(repos.map((repo) => repo.name)).not.toContain("empty-repo");
+    const routes: Record<string, unknown> = {};
+    pages.forEach((page, index) => {
+      routes[`https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=${index + 1}`] =
+        page;
+    });
+    for (const item of pages.flat()) {
+      routes[`https://api.github.com/repos/kev/${item.name}/languages`] = { JavaScript: 1 };
+    }
+    const http = fakeHttp(routes);
+    const repos = await fetchGithubRepos(http, "kev", tempCacheDir(), { authenticated: true });
+
+    const listingCalls = http.calls.filter((url) => url.startsWith("https://api.github.com/user/repos"));
+    expect(listingCalls.length).toBe(3);
+    expect(repos.length).toBe(MAX_REPOS_AUTHENTICATED);
   });
 
   test("surfaces private: true on the returned repo", async () => {
@@ -249,15 +334,16 @@ describe("fetchGithubRepos authenticated", () => {
       "https://api.github.com/users/kev/repos?per_page=100&sort=pushed": listingWithOwner,
       "https://api.github.com/repos/someorg/warren/languages": { TypeScript: 1 },
     };
-    await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
+    const repos = await fetchGithubRepos(fakeHttp(routes), "kev", cacheDir);
     expect(await Bun.file(join(cacheDir, "someorg--warren.json")).exists()).toBe(true);
+    expect(repos[0]?.owner).toBe("someorg");
   });
 
   test("authenticated rate-limit error mentions 5000, not 60", async () => {
     const limited = fakeHttp({
-      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed": new HttpError(
+      "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1": new HttpError(
         403,
-        "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed",
+        "https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=pushed&page=1",
         "API rate limit exceeded",
       ),
     });

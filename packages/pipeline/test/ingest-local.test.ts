@@ -4,11 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   MAX_LOCAL_DEPS,
-  MAX_LOCAL_README_CHARS,
-  localReposNotOnGithub,
+  defaultLocalRoots,
+  localReposToIngest,
   scanLocalRepos,
   type LocalRepo,
 } from "../src/ingest/local";
+import { MAX_README_CHARS } from "../src/ingest/constants";
 
 function tempRoot(): string {
   return mkdtempSync(join(tmpdir(), "scout-local-"));
@@ -18,8 +19,18 @@ async function makeGitDirRepo(repoPath: string, configText = "[core]\n\treposito
   await Bun.write(join(repoPath, ".git", "config"), configText);
 }
 
-async function makeGitFileRepo(repoPath: string): Promise<void> {
-  await Bun.write(join(repoPath, ".git"), "gitdir: ../.git/worktrees/repo\n");
+async function makeWorktreeRepo(repoPath: string, configText: string): Promise<void> {
+  const gitdir = join(repoPath, "..", ".git-worktrees", "repo");
+  const commondir = join(repoPath, "..", ".git-common");
+  await Bun.write(join(repoPath, ".git"), `gitdir: ${gitdir}\n`);
+  await Bun.write(join(gitdir, "commondir"), `${commondir}\n`);
+  await Bun.write(join(commondir, "config"), configText);
+}
+
+async function makeSubmoduleRepo(repoPath: string, configText: string): Promise<void> {
+  const gitdir = join(repoPath, "..", ".git-modules", "repo");
+  await Bun.write(join(repoPath, ".git"), `gitdir: ${gitdir}\n`);
+  await Bun.write(join(gitdir, "config"), configText);
 }
 
 describe("scanLocalRepos", () => {
@@ -68,16 +79,16 @@ describe("scanLocalRepos", () => {
     expect(repo?.readme).toBe("Plain text");
   });
 
-  test("trims before slicing the README to MAX_LOCAL_README_CHARS", async () => {
+  test("trims before slicing the README to MAX_README_CHARS", async () => {
     const root = tempRoot();
     const repoPath = join(root, "repo-a");
     await makeGitDirRepo(repoPath);
-    const core = "y".repeat(MAX_LOCAL_README_CHARS);
+    const core = "y".repeat(MAX_README_CHARS);
     await Bun.write(join(repoPath, "README.md"), `  \n${core}  \n`);
 
     const [repo] = await scanLocalRepos([root]);
     expect(repo?.readme).toBe(core);
-    expect(repo?.readme?.length).toBe(MAX_LOCAL_README_CHARS);
+    expect(repo?.readme?.length).toBe(MAX_README_CHARS);
   });
 
   test("readme is null when no README variant exists", async () => {
@@ -99,23 +110,43 @@ describe("scanLocalRepos", () => {
     expect(repo?.manifests).toEqual(["package.json", "go.mod"]);
   });
 
-  test("deps are the sorted union of dependencies and devDependencies, capped", async () => {
+  test("caps combined deps at MAX_LOCAL_DEPS, dependencies filling before devDependencies", async () => {
     const root = tempRoot();
     const repoPath = join(root, "repo-a");
     await makeGitDirRepo(repoPath);
-    const dependencies: Record<string, string> = {};
+    const dependencies: Record<string, string> = { zebra: "1.0.0" };
     for (let index = 0; index < 50; index += 1) {
       dependencies[`pkg-${String(index).padStart(2, "0")}`] = "1.0.0";
     }
     await Bun.write(
       join(repoPath, "package.json"),
-      JSON.stringify({ dependencies: { zebra: "1.0.0", ...dependencies }, devDependencies: { aardvark: "1.0.0" } }),
+      JSON.stringify({ dependencies, devDependencies: { aardvark: "1.0.0" } }),
     );
 
     const [repo] = await scanLocalRepos([root]);
     expect(repo?.deps.length).toBe(MAX_LOCAL_DEPS);
-    expect(repo?.deps[0]).toBe("aardvark");
-    expect([...(repo?.deps ?? [])]).toEqual([...(repo?.deps ?? [])].sort());
+    expect(repo?.deps).not.toContain("aardvark");
+    expect(repo?.deps[0]).toBe("pkg-00");
+  });
+
+  test("filters @types/* from both dependency groups instead of letting it crowd out real deps", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath);
+    const devDependencies: Record<string, string> = { zeta: "1.0.0" };
+    for (let index = 0; index < 38; index += 1) {
+      devDependencies[`@types/pkg-${String(index).padStart(2, "0")}`] = "1.0.0";
+    }
+    await Bun.write(
+      join(repoPath, "package.json"),
+      JSON.stringify({
+        dependencies: { "@types/should-be-dropped": "1.0.0", zebra: "1.0.0", axios: "1.0.0" },
+        devDependencies,
+      }),
+    );
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.deps).toEqual(["axios", "zebra", "zeta"]);
   });
 
   test("unparseable package.json yields empty deps but still lists the manifest", async () => {
@@ -150,6 +181,57 @@ describe("scanLocalRepos", () => {
     expect(repo?.remote).toBe("kev/warren");
   });
 
+  test("parses a GitHub remote from an ssh:// origin URL", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath, '[remote "origin"]\n\turl = ssh://git@github.com/kev/warren.git\n');
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
+  test("parses a GitHub remote from an HTTPS origin URL with userinfo", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath, '[remote "origin"]\n\turl = https://kev@github.com/kev/warren.git\n');
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
+  test("tolerates trailing comments on the section header and the url line", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(
+      repoPath,
+      '[remote "origin"] ; primary remote\n\turl = git@github.com:kev/warren.git ; ssh form\n',
+    );
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
+  test("section headers are matched case-insensitively", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(repoPath, '[REMOTE "ORIGIN"]\n\turl = git@github.com:kev/warren.git\n');
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
+  test("resolves origin when declared after another remote section", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeGitDirRepo(
+      repoPath,
+      '[remote "upstream"]\n\turl = git@github.com:someone/else.git\n[remote "origin"]\n\turl = git@github.com:kev/warren.git\n',
+    );
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
   test("remote is null for a non-GitHub host", async () => {
     const root = tempRoot();
     const repoPath = join(root, "repo-a");
@@ -159,13 +241,22 @@ describe("scanLocalRepos", () => {
     expect(repo?.remote).toBeNull();
   });
 
-  test("remote is null when .git is a file", async () => {
+  test("resolves the remote for a worktree via .git file -> gitdir -> commondir -> config", async () => {
     const root = tempRoot();
     const repoPath = join(root, "repo-a");
-    await makeGitFileRepo(repoPath);
+    await makeWorktreeRepo(repoPath, '[remote "origin"]\n\turl = git@github.com:kev/warren.git\n');
 
     const [repo] = await scanLocalRepos([root]);
-    expect(repo?.remote).toBeNull();
+    expect(repo?.remote).toBe("kev/warren");
+  });
+
+  test("resolves the remote for a submodule .git file with no commondir", async () => {
+    const root = tempRoot();
+    const repoPath = join(root, "repo-a");
+    await makeSubmoduleRepo(repoPath, '[remote "origin"]\n\turl = git@github.com:kev/warren.git\n');
+
+    const [repo] = await scanLocalRepos([root]);
+    expect(repo?.remote).toBe("kev/warren");
   });
 
   test("a missing root does not throw", async () => {
@@ -183,7 +274,31 @@ describe("scanLocalRepos", () => {
   });
 });
 
-describe("localReposNotOnGithub", () => {
+describe("defaultLocalRoots", () => {
+  test("splits and trims a comma-separated override, dropping empty entries", () => {
+    const roots = defaultLocalRoots({ SCOUT_LOCAL_REPO_ROOTS: " /a/b , /c/d ,, /e/f " });
+    expect(roots).toEqual(["/a/b", "/c/d", "/e/f"]);
+  });
+
+  test("expands a leading ~ in each configured root against HOME/USERPROFILE", () => {
+    const roots = defaultLocalRoots({ SCOUT_LOCAL_REPO_ROOTS: "~/Code,~", HOME: "/home/kev" });
+    expect(roots).toEqual([join("/home/kev", "Code"), "/home/kev"]);
+  });
+
+  test("falls back through USERPROFILE, then HOME, then '.'", () => {
+    expect(defaultLocalRoots({ USERPROFILE: "/u/kev" })).toEqual([
+      join("/u/kev", "Documents", "Coding"),
+      join("/u/kev", "Projects"),
+    ]);
+    expect(defaultLocalRoots({ HOME: "/home/kev" })).toEqual([
+      join("/home/kev", "Documents", "Coding"),
+      join("/home/kev", "Projects"),
+    ]);
+    expect(defaultLocalRoots({})).toEqual([join(".", "Documents", "Coding"), join(".", "Projects")]);
+  });
+});
+
+describe("localReposToIngest", () => {
   function repo(overrides: Partial<LocalRepo>): LocalRepo {
     return {
       name: "repo",
@@ -198,19 +313,43 @@ describe("localReposNotOnGithub", () => {
 
   test("drops repos matching a github name case-insensitively", () => {
     const local = [repo({ name: "Warren", remote: "kev/warren" }), repo({ name: "scratchpad" })];
-    const kept = localReposNotOnGithub(local, ["warren"]);
+    const kept = localReposToIngest(local, ["warren"], new Set(["kev"]));
     expect(kept.map((entry) => entry.name)).toEqual(["scratchpad"]);
   });
 
   test("drops repos matching a github name via the remote's name part", () => {
     const local = [repo({ name: "local-alias", remote: "kev/OTHER-TOOL" })];
-    const kept = localReposNotOnGithub(local, ["other-tool"]);
+    const kept = localReposToIngest(local, ["other-tool"], new Set(["kev"]));
     expect(kept).toEqual([]);
   });
 
   test("keeps repos that match nothing", () => {
     const local = [repo({ name: "totally-local", remote: null })];
-    const kept = localReposNotOnGithub(local, ["warren", "other-tool"]);
+    const kept = localReposToIngest(local, ["warren", "other-tool"], new Set(["kev"]));
     expect(kept.map((entry) => entry.name)).toEqual(["totally-local"]);
+  });
+
+  test("drops a repo whose remote owner is not in the owners set", () => {
+    const local = [repo({ name: "someone-elses-fork", remote: "otherperson/tool" })];
+    const kept = localReposToIngest(local, [], new Set(["kev"]));
+    expect(kept).toEqual([]);
+  });
+
+  test("keeps a repo with a null remote even when it matches nothing", () => {
+    const local = [repo({ name: "scratch-notes", remote: null })];
+    const kept = localReposToIngest(local, [], new Set(["kev"]));
+    expect(kept.map((entry) => entry.name)).toEqual(["scratch-notes"]);
+  });
+
+  test("keeps an owned repo not on the github list", () => {
+    const local = [repo({ name: "side-project", remote: "kev/side-project" })];
+    const kept = localReposToIngest(local, ["warren"], new Set(["kev"]));
+    expect(kept.map((entry) => entry.name)).toEqual(["side-project"]);
+  });
+
+  test("owner matching is case-insensitive", () => {
+    const local = [repo({ name: "side-project", remote: "KEV/side-project" })];
+    const kept = localReposToIngest(local, [], new Set(["kev"]));
+    expect(kept.map((entry) => entry.name)).toEqual(["side-project"]);
   });
 });

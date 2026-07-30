@@ -1,15 +1,17 @@
+import { sha256 } from "@scout/core";
 import {
   ClaudeCliClient,
+  classifyLocalRepo,
   createHttpClient,
   defaultLocalRoots,
   extractProfileInventory,
   fetchGithubRepos,
   loadResumeDocument,
-  localReposNotOnGithub,
   resolveGithubToken,
   scanLocalRepos,
   type ProfileDocument,
 } from "@scout/pipeline";
+import { stat } from "node:fs/promises";
 
 const user = process.env.SCOUT_GITHUB_USER ?? "kevingastelum";
 const cacheDir = "profile/cache/github";
@@ -24,7 +26,7 @@ const http = createHttpClient({
 const llm = new ClaudeCliClient();
 
 console.log(
-  `Fetching repos for ${user} (authenticated: ${authenticated ? "includes private" : "public only"})...`,
+  `Listing ${authenticated ? "owned repos (public + private)" : "public repos"} for ${user}...`,
 );
 const repos = await fetchGithubRepos(http, user, cacheDir, { authenticated });
 const privateCount = repos.filter((repo) => repo.private).length;
@@ -39,7 +41,6 @@ const documents: ProfileDocument[] = repos.map((repo) => ({
     language: repo.language,
     languages: repo.languages,
     topics: repo.topics,
-    stars: repo.stars,
     readme: repo.readme,
   }),
 }));
@@ -51,13 +52,25 @@ if (resume === null) {
   documents.push(resume);
 }
 
-const localRepos = await scanLocalRepos(defaultLocalRoots());
-const localOnly = localReposNotOnGithub(
-  localRepos,
-  repos.map((repo) => repo.name),
+const localRoots = defaultLocalRoots();
+for (const root of localRoots) {
+  const info = await stat(root).catch(() => null);
+  if (info === null || !info.isDirectory()) {
+    console.log(`Local repo root not found, skipping: ${root}`);
+  }
+}
+
+const localRepos = await scanLocalRepos(localRoots);
+const owners = new Set(
+  [user, ...repos.map((repo) => repo.owner)].map((name) => name.toLowerCase()),
 );
+const githubNames = new Set(repos.map((repo) => repo.name.toLowerCase()));
+const dispositions = localRepos.map((repo) => classifyLocalRepo(repo, githubNames, owners));
+const localOnly = localRepos.filter((_, index) => dispositions[index] === "keep");
+const droppedDuplicate = dispositions.filter((d) => d === "duplicate").length;
+const droppedForeign = dispositions.filter((d) => d === "foreign").length;
 console.log(
-  `Found ${localRepos.length} local checkouts, ${localOnly.length} not already on GitHub after dedup`,
+  `Found ${localRepos.length} local checkouts: ${localOnly.length} kept, ${droppedDuplicate} already on GitHub, ${droppedForeign} owned by someone else`,
 );
 const localWithContent = localOnly.filter(
   (repo) => repo.readme !== null || repo.manifests.length > 0 || repo.deps.length > 0,
@@ -65,7 +78,7 @@ const localWithContent = localOnly.filter(
 
 for (const repo of localWithContent) {
   documents.push({
-    id: `local:${repo.name}`,
+    id: `local:${repo.name}:${sha256(repo.path).slice(0, 8)}`,
     kind: "repo",
     title: `local:${repo.name}`,
     text: JSON.stringify({

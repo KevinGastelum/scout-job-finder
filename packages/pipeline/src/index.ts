@@ -141,22 +141,25 @@ export {
   type FunnelSummary,
   type RetrievalCandidate,
 } from "./funnel";
+export { MAX_README_CHARS } from "./ingest/constants";
 export {
   GITHUB_API,
   MAX_REPOS,
   MAX_REPOS_AUTHENTICATED,
   fetchGithubRepos,
+  type FetchGithubReposOptions,
   type GithubRepo,
 } from "./ingest/github";
 export {
   MAX_LOCAL_DEPS,
-  MAX_LOCAL_README_CHARS,
+  classifyLocalRepo,
   defaultLocalRoots,
-  localReposNotOnGithub,
+  localReposToIngest,
   scanLocalRepos,
   type LocalRepo,
+  type LocalRepoDisposition,
 } from "./ingest/local";
-export { resolveGithubToken } from "./ingest/token";
+export { resolveGithubToken, type CommandRunner } from "./ingest/token";
 export {
   EXTRACT_BATCH_SIZE,
   PROFILE_EXTRACT_PROMPT_VERSION,
