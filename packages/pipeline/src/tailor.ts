@@ -96,6 +96,52 @@ ${data}
 Draft the application materials and return the structured JSON.`;
 }
 
+export const DRAFT_FILES = ["resume-slant.md", "cover-letter.md"] as const;
+
+// jobId is a positive integer and the slug collapses to [a-z0-9-], so the path cannot
+// escape profile/applications or collide across jobs.
+export function draftDirFor(job: Pick<Job, "id" | "companyNormalized">): string {
+  const slug = job.companyNormalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `profile/applications/${job.id}-${slug}`;
+}
+
+// Board-supplied text goes into an HTML comment, and any "--" can end one ("--!>" is a
+// closer too). Prose gets an em dash; the url percent-encodes, which decodes to the same
+// address.
+function commentSafe(value: string): string {
+  return value.replaceAll("--", "—");
+}
+
+export async function writeTailorDrafts(job: Job, result: TailorResult): Promise<string> {
+  const dir = draftDirFor(job);
+  const header = `<!-- ${commentSafe(job.title)} @ ${commentSafe(job.company)} · job ${job.id} · ${job.url.replaceAll("--", "%2D%2D")} -->\n\n`;
+  await Bun.write(`${dir}/resume-slant.md`, header + result.resumeSlant.trim() + "\n");
+  await Bun.write(
+    `${dir}/cover-letter.md`,
+    header +
+      result.coverLetter.trim() +
+      "\n\n## Talking points\n" +
+      result.talkingPoints.map((point) => `- ${point}`).join("\n") +
+      "\n\n## Gaps to be ready for\n" +
+      (result.gaps.length === 0
+        ? "- none identified\n"
+        : result.gaps.map((gap) => `- ${gap}`).join("\n") + "\n"),
+  );
+  return dir;
+}
+
+export async function readTailorDrafts(
+  job: Pick<Job, "id" | "companyNormalized">,
+): Promise<Array<{ name: string; content: string }>> {
+  const dir = draftDirFor(job);
+  const drafts: Array<{ name: string; content: string }> = [];
+  for (const name of DRAFT_FILES) {
+    const file = Bun.file(`${dir}/${name}`);
+    if (await file.exists()) drafts.push({ name, content: await file.text() });
+  }
+  return drafts;
+}
+
 export async function tailorForJob(
   llm: LlmClient,
   job: Job,

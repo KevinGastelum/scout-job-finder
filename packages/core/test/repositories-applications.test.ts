@@ -7,6 +7,7 @@ import { upsertJob } from "../src/repositories/jobs";
 import {
   getApplication,
   listApplications,
+  setApplicationNotes,
   setApplicationStatus,
 } from "../src/repositories/applications";
 import type { NormalizedJob } from "../src/types";
@@ -99,6 +100,29 @@ describe("applications repository", () => {
 
     setApplicationStatus(db, jobId, "interview", "2026-08-05T09:00:00.000Z");
     expect(getApplication(db, jobId)?.appliedAt).toBe("2026-07-30T09:00:00.000Z");
+    db.close();
+  });
+
+  test("a note on an untracked job shortlists it; on a tracked one only the note changes", async () => {
+    const { db, ids } = await seed(["1", "2"]);
+    const fresh = setApplicationNotes(db, ids[0] ?? 0, "ping recruiter", "2026-07-31T10:00:00.000Z");
+    expect(fresh.status).toBe("shortlisted");
+    expect(fresh.notes).toBe("ping recruiter");
+
+    setApplicationStatus(db, ids[1] ?? 0, "applied", "2026-07-30T09:00:00.000Z");
+    const tracked = setApplicationNotes(db, ids[1] ?? 0, "sent via portal", "2026-07-31T10:00:00.000Z");
+    expect(tracked.status).toBe("applied");
+    expect(tracked.notes).toBe("sent via portal");
+    expect(tracked.appliedAt).toBe("2026-07-30T09:00:00.000Z");
+    db.close();
+  });
+
+  test("a whitespace-only note clears the stored note", async () => {
+    const { db, ids } = await seed(["1"]);
+    const jobId = ids[0] ?? 0;
+    setApplicationNotes(db, jobId, "keep this", "2026-07-31T10:00:00.000Z");
+    const cleared = setApplicationNotes(db, jobId, "   ", "2026-07-31T11:00:00.000Z");
+    expect(cleared.notes).toBeNull();
     db.close();
   });
 

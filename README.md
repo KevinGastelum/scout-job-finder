@@ -80,6 +80,13 @@ bun run verify-boards   # probe the Greenhouse/Lever/Ashby seed tokens
 `score` exists because the rubric cache keys on the profile version: editing `profile/profile.md`
 invalidates every stored score, and re-scoring shouldn't require re-fetching fifteen sources.
 
+The dashboard is a single-user application tracker in the Huntr/Teal mold: a pipeline header
+counts every stage (`to-review` → `to-apply` → `waiting` → `closed`) and filters on click,
+alongside search, a per-source filter, and an "applied Nd ago" age on anything in flight. Each
+card holds free-form notes (saved on blur), and a **drafts** button that shows the generated
+resume slant and cover letter inline — or a **Tailor now** button that generates them from the
+dashboard, no CLI needed.
+
 `tailor` takes a `job_id` from the CSV or dashboard and writes `resume-slant.md` and
 `cover-letter.md` (with talking points and a plain-spoken gaps list) to gitignored
 `profile/applications/<job>/`. It grounds every claim in the compiled profile and the rubric's

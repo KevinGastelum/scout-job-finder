@@ -8,6 +8,8 @@ export interface ShortlistEntry {
   job: Job;
   score: ScoreRecord;
   applicationStatus: ApplicationStatus | null;
+  appliedAt: string | null;
+  notes: string | null;
   // How many further locations carry this same posting. 0 for an ordinary single-location job.
   alsoPostedIn: number;
 }
@@ -69,10 +71,18 @@ export function listShortlist(
     const score = getScore(db, row.job_id, rubricVersion);
     if (job === null || score === null) continue;
 
-    const applicationStatus = getApplication(db, row.job_id)?.status ?? null;
+    const application = getApplication(db, row.job_id);
+    const applicationStatus = application?.status ?? null;
     if (!includeDismissed && applicationStatus === "dismissed") continue;
 
-    entries.push({ job, score, applicationStatus, alsoPostedIn: row.also_posted_in });
+    entries.push({
+      job,
+      score,
+      applicationStatus,
+      appliedAt: application?.appliedAt ?? null,
+      notes: application?.notes ?? null,
+      alsoPostedIn: row.also_posted_in,
+    });
   }
   return entries;
 }

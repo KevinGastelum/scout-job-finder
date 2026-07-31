@@ -466,4 +466,125 @@ describe("origin guard", () => {
     expect(response.status).toBe(403);
     db.close();
   });
+
+  test("GET /api/jobs/:id/drafts answers an empty list before any tailoring", async () => {
+    const { db, jobId } = await seed();
+    const response = await appFor(db)(new Request(`http://localhost/api/jobs/${jobId}/drafts`));
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { drafts: unknown[] }).drafts).toEqual([]);
+
+    const missing = await appFor(db)(new Request("http://localhost/api/jobs/999999/drafts"));
+    expect(missing.status).toBe(404);
+    db.close();
+  });
+
+  test("POST /api/jobs/:id/tailor is 503 when no generator is wired", async () => {
+    const { db, jobId } = await seed();
+    const response = await appFor(db)(
+      new Request(`http://localhost/api/jobs/${jobId}/tailor`, { method: "POST" }),
+    );
+    expect(response.status).toBe(503);
+    db.close();
+  });
+
+  test("POST /api/jobs/:id/tailor writes drafts, advances status, and guards overwrites", async () => {
+    const { db, jobId } = await seed();
+    const app = createApp({
+      db,
+      rubricVersion: RUBRIC_VERSION,
+      startScan: async () => ({ runId: 7 }),
+      generateTailor: async () => ({
+        resumeSlant: "Lead with Scout.",
+        coverLetter: "Dear team.",
+        talkingPoints: ["point"],
+        gaps: [],
+      }),
+      now: () => new Date("2026-07-28T12:00:00.000Z"),
+    });
+
+    try {
+      const created = await app(
+        new Request(`http://localhost/api/jobs/${jobId}/tailor`, { method: "POST" }),
+      );
+      expect(created.status).toBe(200);
+      const body = (await created.json()) as {
+        drafts: Array<{ name: string }>;
+        application: { status: string } | null;
+      };
+      expect(body.drafts.map((draft) => draft.name).sort()).toEqual([
+        "cover-letter.md",
+        "resume-slant.md",
+      ]);
+      expect(body.application?.status).toBe("tailored");
+
+      const refused = await app(
+        new Request(`http://localhost/api/jobs/${jobId}/tailor`, { method: "POST" }),
+      );
+      expect(refused.status).toBe(409);
+
+      const forced = await app(
+        new Request(`http://localhost/api/jobs/${jobId}/tailor`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ force: true }),
+        }),
+      );
+      expect(forced.status).toBe(200);
+
+      const read = await app(new Request(`http://localhost/api/jobs/${jobId}/drafts`));
+      const listed = (await read.json()) as { drafts: Array<{ name: string; content: string }> };
+      expect(listed.drafts.find((d) => d.name === "cover-letter.md")?.content).toContain(
+        "Dear team.",
+      );
+    } finally {
+      const { rmSync } = await import("node:fs");
+      rmSync(`profile/applications/${jobId}-company-1`, { recursive: true, force: true });
+      db.close();
+    }
+  });
+
+  test("POST /api/jobs/:id/notes stores and validates the note", async () => {
+    const { db, jobId } = await seed();
+    const app = appFor(db);
+
+    const saved = await app(
+      new Request(`http://localhost/api/jobs/${jobId}/notes`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ notes: "recruiter is Dana, follow up Friday" }),
+      }),
+    );
+    expect(saved.status).toBe(200);
+    const body = (await saved.json()) as { application: { notes: string | null; status: string } };
+    expect(body.application.notes).toBe("recruiter is Dana, follow up Friday");
+    expect(body.application.status).toBe("shortlisted");
+
+    const invalid = await app(
+      new Request(`http://localhost/api/jobs/${jobId}/notes`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ notes: 42 }),
+      }),
+    );
+    expect(invalid.status).toBe(400);
+
+    const oversized = await app(
+      new Request(`http://localhost/api/jobs/${jobId}/notes`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ notes: "x".repeat(20_001) }),
+      }),
+    );
+    expect(oversized.status).toBe(400);
+
+    const missing = await app(
+      new Request("http://localhost/api/jobs/999999/notes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ notes: "hi" }),
+      }),
+    );
+    expect(missing.status).toBe(404);
+    db.close();
+  });
 });

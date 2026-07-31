@@ -1,12 +1,16 @@
 import {
   APPLICATION_STATUSES,
+  getApplication,
   getJobById,
   getLatestRun,
   listShortlist,
+  setApplicationNotes,
   setApplicationStatus,
   type ApplicationStatus,
   type Database,
+  type Job,
 } from "@scout/core";
+import { readTailorDrafts, writeTailorDrafts, type TailorResult } from "@scout/pipeline";
 
 export interface AppDeps {
   db: Database;
@@ -15,6 +19,9 @@ export interface AppDeps {
   // up, and a shortlist ranked against a version that is no longer current is worse than none.
   currentProfileVersion?: () => Promise<string | undefined>;
   startScan: () => Promise<{ runId: number }>;
+  // The LLM half of tailoring, injected so tests can fake a draft without spawning a CLI.
+  // Absent means the environment has no authenticated CLI and the route answers 503.
+  generateTailor?: (job: Job) => Promise<TailorResult>;
   // Hostnames to accept besides loopback. Only for running behind a proxy that authenticates
   // before forwarding — this server still has no auth of its own.
   trustedHosts?: string[];
@@ -24,7 +31,11 @@ export interface AppDeps {
 export type AppHandler = (request: Request) => Promise<Response>;
 
 const STATUS_ROUTE = /^\/api\/jobs\/(\d+)\/status$/;
+const DRAFTS_ROUTE = /^\/api\/jobs\/(\d+)\/drafts$/;
+const TAILOR_ROUTE = /^\/api\/jobs\/(\d+)\/tailor$/;
+const NOTES_ROUTE = /^\/api\/jobs\/(\d+)\/notes$/;
 const MAX_SHORTLIST_LIMIT = 500;
+const MAX_NOTES_CHARS = 20_000;
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -73,6 +84,7 @@ export function createApp(deps: AppDeps): AppHandler {
   const now = deps.now ?? (() => new Date());
   const trustedHosts = new Set((deps.trustedHosts ?? []).map((host) => host.trim().toLowerCase()));
   let scanning = false;
+  let tailoring = false;
 
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -133,6 +145,77 @@ export function createApp(deps: AppDeps): AppHandler {
       } finally {
         scanning = false;
       }
+    }
+
+    const draftsMatch = DRAFTS_ROUTE.exec(path);
+    if (draftsMatch !== null) {
+      if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
+      const job = getJobById(deps.db, Number(draftsMatch[1]));
+      if (job === null) return json({ error: "unknown job" }, 404);
+      return json({ drafts: await readTailorDrafts(job) });
+    }
+
+    const tailorMatch = TAILOR_ROUTE.exec(path);
+    if (tailorMatch !== null) {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      if (deps.generateTailor === undefined) {
+        return json({ error: "tailoring unavailable in this environment" }, 503);
+      }
+      const job = getJobById(deps.db, Number(tailorMatch[1]));
+      if (job === null) return json({ error: "unknown job" }, 404);
+
+      let force = false;
+      try {
+        force = ((await request.json()) as { force?: unknown } | null)?.force === true;
+      } catch {
+        // an empty body means no overwrite
+      }
+      if (!force && (await readTailorDrafts(job)).length > 0) {
+        return json({ error: "drafts already exist — pass {\"force\": true} to redo them" }, 409);
+      }
+      // One at a time: each call spawns a claude subprocess on the shared subscription quota.
+      if (tailoring) return json({ error: "a tailor call is already running" }, 409);
+      tailoring = true;
+      try {
+        const result = await deps.generateTailor(job);
+        await writeTailorDrafts(job, result);
+        // Drafting is what "tailored" means, and requesting it is the review — untracked
+        // advances too. Later real-world statuses (applied, interview) never walk back.
+        const status = getApplication(deps.db, job.id)?.status ?? null;
+        let application = getApplication(deps.db, job.id);
+        if (status === null || status === "shortlisted") {
+          application = setApplicationStatus(deps.db, job.id, "tailored", now().toISOString());
+        }
+        return json({ drafts: await readTailorDrafts(job), application });
+      } catch (error) {
+        console.error("tailor failed:", error);
+        return json({ error: "tailor failed — check server logs" }, 500);
+      } finally {
+        tailoring = false;
+      }
+    }
+
+    const notesMatch = NOTES_ROUTE.exec(path);
+    if (notesMatch !== null) {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      const jobId = Number(notesMatch[1]);
+      if (getJobById(deps.db, jobId) === null) return json({ error: "unknown job" }, 404);
+
+      let payload: unknown;
+      try {
+        payload = await request.json();
+      } catch {
+        return json({ error: "body must be JSON" }, 400);
+      }
+      const notes = (payload as { notes?: unknown } | null)?.notes;
+      if (typeof notes !== "string" || notes.length > MAX_NOTES_CHARS) {
+        return json(
+          { error: `notes must be a string of at most ${MAX_NOTES_CHARS} characters` },
+          400,
+        );
+      }
+      const application = setApplicationNotes(deps.db, jobId, notes, now().toISOString());
+      return json({ application });
     }
 
     const statusMatch = STATUS_ROUTE.exec(path);

@@ -13,7 +13,9 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 export async function fetchShortlist(includeDismissed: boolean): Promise<ShortlistEntry[]> {
-  const query = includeDismissed ? "?includeDismissed=1" : "";
+  // The server caps at 500 anyway; asking for the cap makes the client-side pipeline
+  // counts and filters cover the whole shortlist instead of the first page.
+  const query = includeDismissed ? "?limit=500&includeDismissed=1" : "?limit=500";
   const body = await readJson<{ entries: ShortlistEntry[] }>(await fetch(`/api/shortlist${query}`));
   return body.entries;
 }
@@ -36,4 +38,35 @@ export async function setStatus(jobId: number, status: ApplicationStatus): Promi
 export async function triggerRun(): Promise<number> {
   const body = await readJson<{ runId: number }>(await fetch("/api/run", { method: "POST" }));
   return body.runId;
+}
+
+export interface Draft {
+  name: string;
+  content: string;
+}
+
+export async function fetchDrafts(jobId: number): Promise<Draft[]> {
+  const body = await readJson<{ drafts: Draft[] }>(await fetch(`/api/jobs/${jobId}/drafts`));
+  return body.drafts;
+}
+
+export async function tailorJob(jobId: number, force: boolean): Promise<Draft[]> {
+  const body = await readJson<{ drafts: Draft[] }>(
+    await fetch(`/api/jobs/${jobId}/tailor`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ force }),
+    }),
+  );
+  return body.drafts;
+}
+
+export async function saveNotes(jobId: number, notes: string): Promise<void> {
+  await readJson<unknown>(
+    await fetch(`/api/jobs/${jobId}/notes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ notes }),
+    }),
+  );
 }

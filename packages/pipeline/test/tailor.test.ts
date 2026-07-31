@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import { rmSync } from "node:fs";
 import type { CapabilityProfile, Job, ScoreRecord } from "@scout/core";
 import { MockLlmClient } from "../src/llm/mock";
-import { buildTailorPrompt, tailorForJob } from "../src/tailor";
+import {
+  buildTailorPrompt,
+  draftDirFor,
+  readTailorDrafts,
+  tailorForJob,
+  writeTailorDrafts,
+} from "../src/tailor";
 
 const PROFILE: CapabilityProfile = {
   version: "abc123abc123",
@@ -88,6 +95,36 @@ describe("buildTailorPrompt", () => {
     const prompt = buildTailorPrompt(job({ description: "x".repeat(30_000) }), PROFILE, null, null);
     expect(prompt).toContain("[truncated]");
     expect(prompt.length).toBeLessThan(25_000);
+  });
+});
+
+describe("draft files", () => {
+  test("the draft directory is derived from the id and a collapsed slug", () => {
+    expect(draftDirFor({ id: 42, companyNormalized: "acme ai" })).toBe(
+      "profile/applications/42-acme-ai",
+    );
+    expect(draftDirFor({ id: 7, companyNormalized: "a & b co" })).toBe(
+      "profile/applications/7-a-b-co",
+    );
+  });
+
+  test("board-supplied text cannot close the header comment", async () => {
+    const crafted = job({
+      id: 424242,
+      title: "Engineer --> injected",
+      url: "https://acme.example/jobs/x--y",
+    });
+    try {
+      await writeTailorDrafts(crafted, RESULT);
+      const drafts = await readTailorDrafts(crafted);
+      const letter = drafts.find((draft) => draft.name === "cover-letter.md")?.content ?? "";
+      const headerEnd = letter.indexOf("-->");
+      // The only "-->" is the header's own closer, after the escaped title and url.
+      expect(letter.slice(0, headerEnd)).toContain("Engineer —> injected");
+      expect(letter.slice(0, headerEnd)).toContain("x%2D%2Dy");
+    } finally {
+      rmSync(draftDirFor(crafted), { recursive: true, force: true });
+    }
   });
 });
 

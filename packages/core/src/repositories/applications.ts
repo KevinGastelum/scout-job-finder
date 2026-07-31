@@ -9,6 +9,7 @@ interface ApplicationRow {
   applied_at: string | null;
   artifacts_path: string | null;
   submission_record: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +22,7 @@ export interface ApplicationRecord {
   appliedAt: string | null;
   artifactsPath: string | null;
   submissionRecord: string | null;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +36,7 @@ function toApplication(row: ApplicationRow): ApplicationRecord {
     appliedAt: row.applied_at,
     artifactsPath: row.artifacts_path,
     submissionRecord: row.submission_record,
+    notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -61,6 +64,29 @@ export function setApplicationStatus(
        applied_at = COALESCE(applications.applied_at, excluded.applied_at),
        updated_at = excluded.updated_at`,
     [jobId, status, appliedAt, at, at],
+  );
+  const record = getApplication(db, jobId);
+  if (record === null) throw new Error(`application for job ${jobId} vanished after write`);
+  return record;
+}
+
+// Writing a note never moves a tracked job's stage — only the row's notes change. An
+// untracked job needs a row (status is NOT NULL), and taking notes on a posting is the act
+// of shortlisting it, so that is the status a fresh row gets.
+export function setApplicationNotes(
+  db: Database,
+  jobId: number,
+  notes: string,
+  at: string,
+): ApplicationRecord {
+  const stored = notes.trim().length === 0 ? null : notes;
+  db.run(
+    `INSERT INTO applications (job_id, status, notes, created_at, updated_at)
+     VALUES (?, 'shortlisted', ?, ?, ?)
+     ON CONFLICT (job_id) DO UPDATE SET
+       notes = excluded.notes,
+       updated_at = excluded.updated_at`,
+    [jobId, stored, at, at],
   );
   const record = getApplication(db, jobId);
   if (record === null) throw new Error(`application for job ${jobId} vanished after write`);

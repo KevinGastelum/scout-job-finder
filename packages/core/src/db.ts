@@ -7,6 +7,7 @@ const MIGRATION_FILES = [
   "003_hn_extractions.sql",
   "004_fingerprint_index.sql",
   "005_score_profile_version.sql",
+  "006_application_notes.sql",
 ] as const;
 
 export async function runMigrations(db: Database): Promise<string[]> {

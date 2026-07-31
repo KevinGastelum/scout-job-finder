@@ -21,8 +21,10 @@ Practical runbook for the single human operator (Kevin).
 2. **Open dashboard**: Navigate to http://127.0.0.1:8787.
 3. **Review shortlist**: Review the ranked shortlist along with cited evidence for every match decision.
 4. **Triage candidates**: Update job statuses (`shortlisted`, `dismissed`, `applied`).
-5. **Draft materials**: `bun run tailor <job_id>` for each shortlisted role worth applying to.
-   Read the draft once — especially its gaps list — before sending anything.
+5. **Draft materials**: click **drafts → Tailor now** on the card (or `bun run tailor <job_id>`)
+   for each shortlisted role worth applying to. Read the draft once — especially its gaps
+   list — before sending anything. Jot contacts and follow-ups into the card's notes box;
+   notes save on blur and never change the job's stage.
 6. **Apply**: Apply to top matching positions manually via direct job links, then set the
    status to `applied` so the tracker knows the ball is with them.
 

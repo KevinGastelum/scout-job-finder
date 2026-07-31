@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defaultDbPath, envOr, envValue, loadProfile, openDb } from "@scout/core";
+import { defaultDbPath, envOr, envValue, getScore, loadProfile, openDb } from "@scout/core";
 import {
   AdzunaAdapter,
   ArbeitnowAdapter,
@@ -23,6 +23,7 @@ import {
   extractionLlmFromEnv,
   rubricLlmFromEnv,
   runScan,
+  tailorForJob,
 } from "@scout/pipeline";
 import { createApp } from "./app";
 import { resolveStaticPath } from "./static-path";
@@ -76,6 +77,19 @@ const handleApi = createApp({
       profile: await loadProfile(),
     });
     return { runId: summary.runId };
+  },
+  generateTailor: async (job) => {
+    const profile = await loadProfile();
+    if (profile === undefined) throw new Error("no compiled profile — run `bun run profile`");
+    const positioningFile = Bun.file("profile/positioning.md");
+    const positioning = (await positioningFile.exists())
+      ? (await positioningFile.text()).trim()
+      : null;
+    // A score from an older profile version judged different target roles; better none
+    // than a stale one steering the letter.
+    const storedScore = getScore(db, job.id, RUBRIC_VERSION);
+    const score = storedScore?.profileVersion === profile.version ? storedScore : null;
+    return tailorForJob(rubricLlmFromEnv(), job, profile, score, positioning);
   },
 });
 
