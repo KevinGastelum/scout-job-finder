@@ -130,9 +130,8 @@ export class TeamtailorAdapter implements SourceAdapter {
           title,
           location: locationFor(posting),
           // The feed carries no remote flag — not on the item and not in its schema.org block.
-          // The normalizer still promotes a posting whose location or description says remote,
-          // so this only means the adapter itself contributes no signal.
-          remote: false,
+          // The adapter itself contributes no signal; the normalizer decides from text.
+          remote: null,
           description: htmlToText(decodeEntities(html)),
           salaryText: null,
           postedAt: toIsoOrNull(trimmedString(item.date_published) || trimmedString(posting?.datePosted)),

@@ -111,7 +111,7 @@ describe("HnAdapter", () => {
     expect(first?.description).not.toContain("<p>");
 
     const second = result.items[1];
-    expect(second?.remote).toBe(false);
+    expect(second?.remote).toBeNull();
     expect(second?.url).toBe("https://news.ycombinator.com/item?id=41000020");
   });
 

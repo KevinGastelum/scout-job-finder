@@ -36,7 +36,7 @@ describe("TheMuseAdapter", () => {
     expect(first?.company).toBe("Acme Corp");
     expect(first?.title).toBe("Product Marketing Manager");
     expect(first?.location).toBe("New York, NY");
-    expect(first?.remote).toBe(false);
+    expect(first?.remote).toBeNull();
     expect(first?.salaryText).toBeNull();
     expect(first?.postedAt).toBe("2026-07-20T10:00:00.000Z");
     expect(first?.url).toBe("https://www.themuse.com/jobs/acme/product-marketing-manager-111");

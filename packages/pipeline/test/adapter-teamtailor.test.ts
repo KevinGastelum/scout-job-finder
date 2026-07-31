@@ -71,7 +71,7 @@ describe("TeamtailorAdapter", () => {
     const result = await new TeamtailorAdapter([COMPANIES[0] as SeedCompany]).fetch(
       context(http(() => fixture)),
     );
-    expect(result.items.every((item) => item.remote === false)).toBe(true);
+    expect(result.items.every((item) => item.remote === null)).toBe(true);
   });
 
   test("drops null address parts instead of emitting empty segments", async () => {

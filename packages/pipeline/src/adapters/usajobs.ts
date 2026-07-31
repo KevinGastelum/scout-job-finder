@@ -225,9 +225,9 @@ export class UsaJobsAdapter implements SourceAdapter {
             title,
             location: location.length === 0 ? null : location,
             // The API's remote flag is absent on most announcements and its RemoteIndicator
-            // search filter returns nothing at all, so telework has to be read out of the
-            // announcement text by the normalizer rather than trusted from a field.
-            remote: descriptor?.PositionRemoteIndicator === true,
+            // search filter returns nothing at all, so an absent flag means unknown — the
+            // normalizer reads telework out of the announcement text.
+            remote: descriptor?.PositionRemoteIndicator === true ? true : null,
             description: descriptionFor(descriptor?.UserArea?.Details ?? {}),
             salaryText: salaryTextFor(descriptor?.PositionRemuneration),
             postedAt: postedAtFor(descriptor?.PublicationStartDate),

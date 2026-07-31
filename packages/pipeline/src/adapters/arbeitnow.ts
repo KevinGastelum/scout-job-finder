@@ -92,7 +92,9 @@ export class ArbeitnowAdapter implements SourceAdapter {
         company,
         title,
         location: location.length === 0 ? null : location,
-        remote: job.remote === true,
+        // The flag only affirms; a false is the board's default, not a statement, so it
+        // stays open for the normalizer's text heuristics.
+        remote: job.remote === true ? true : null,
         description: descriptionFor(job),
         salaryText: null,
         postedAt: postedAtFor(job.created_at),

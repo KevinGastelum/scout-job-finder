@@ -111,7 +111,8 @@ export class WorkableAdapter implements SourceAdapter {
           company: company.name,
           title,
           location: locationFor(job),
-          remote: job.telecommuting === true,
+          // telecommuting only affirms — employers leave it false for hybrid roles too.
+          remote: job.telecommuting === true ? true : null,
           description: htmlToText(decodeEntities(trimmedString(job.description))),
           // The widget API carries no compensation field at all, on any board.
           salaryText: null,

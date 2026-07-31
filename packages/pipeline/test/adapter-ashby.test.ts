@@ -75,7 +75,9 @@ describe("AshbyAdapter", () => {
     const result = await new AshbyAdapter([COMPANIES[0] as SeedCompany]).fetch(
       context(http(() => ({ jobs }))),
     );
-    expect(result.items.map((item) => item.remote)).toEqual([true, false]);
+    // isRemote false only means "no claim" — without a workplaceType it is not
+    // authoritative, so the normalizer's text heuristics keep the final say.
+    expect(result.items.map((item) => item.remote)).toEqual([true, null]);
   });
 
   test("falls back to the html description when descriptionPlain is blank", async () => {

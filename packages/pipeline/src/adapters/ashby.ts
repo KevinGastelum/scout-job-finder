@@ -51,12 +51,20 @@ function salaryTextFor(compensation: AshbyCompensation | null | undefined): stri
 }
 
 // Ashby sets isRemote true for Hybrid as well as Remote, so it means "not strictly
-// onsite" rather than "remote". workplaceType is the real three-way discriminator;
-// only fall back to isRemote when the board leaves workplaceType unset.
-function remoteFor(job: AshbyJob): boolean {
-  const workplaceType = trimmedString(job.workplaceType).toLowerCase();
-  if (workplaceType.length > 0) return workplaceType === "remote";
-  return job.isRemote === true;
+// onsite" rather than "remote". workplaceType is the real three-way discriminator and is
+// authoritative in both directions — a Hybrid posting is not remote however often its
+// description says the word. Unknown values fall through to isRemote, then to null so the
+// normalizer's text heuristics get the final say.
+function remoteFor(job: AshbyJob): boolean | null {
+  switch (trimmedString(job.workplaceType).toLowerCase()) {
+    case "remote":
+      return true;
+    case "hybrid":
+    case "onsite":
+      return false;
+    default:
+      return job.isRemote === true ? true : null;
+  }
 }
 
 function descriptionFor(job: AshbyJob): string {

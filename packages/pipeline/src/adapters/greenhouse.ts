@@ -81,7 +81,8 @@ export class GreenhouseAdapter implements SourceAdapter {
           company: company.name,
           title,
           location: location.length === 0 ? null : location,
-          remote: false,
+          // Greenhouse boards carry no workplace field; the normalizer decides from text.
+          remote: null,
           description: htmlToText(decodeEntities(job.content ?? "")),
           salaryText: null,
           postedAt: toIsoOrNull(job.updated_at),

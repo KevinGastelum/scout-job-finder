@@ -51,6 +51,21 @@ function formatSalary(range: LeverSalaryRange | null | undefined): string | null
   return parts.filter((part) => part.length > 0).join(" ");
 }
 
+// Lever's own three-way discriminator, authoritative both ways when it holds a known
+// value; anything else leaves the decision to the normalizer's text heuristics.
+function remoteFor(posting: LeverPosting): boolean | null {
+  switch ((posting.workplaceType ?? "").trim().toLowerCase()) {
+    case "remote":
+      return true;
+    case "hybrid":
+    case "on-site":
+    case "onsite":
+      return false;
+    default:
+      return null;
+  }
+}
+
 function buildDescription(posting: LeverPosting): string {
   const blocks = [posting.description ?? ""];
   for (const list of posting.lists ?? []) {
@@ -118,7 +133,7 @@ export class LeverAdapter implements SourceAdapter {
           company: company.name,
           title,
           location: location.length === 0 ? null : location,
-          remote: posting.workplaceType === "remote",
+          remote: remoteFor(posting),
           description: buildDescription(posting),
           salaryText: formatSalary(posting.salaryRange),
           postedAt: postedAtOf(posting.createdAt),

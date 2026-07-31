@@ -96,7 +96,7 @@ describe("UsaJobsAdapter", () => {
     expect(first?.company).toBe("Bureau of Labor Statistics");
     expect(first?.location).toBe("Washington, District of Columbia");
     expect(first?.url).toBe("https://www.usajobs.gov/job/845132900");
-    expect(first?.remote).toBe(false);
+    expect(first?.remote).toBeNull();
     expect(first?.salaryText).toBe("$117,962–$153,354 Per Year");
   });
 

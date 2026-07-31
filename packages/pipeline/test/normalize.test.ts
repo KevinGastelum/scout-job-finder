@@ -41,14 +41,14 @@ describe("normalizeItem", () => {
   });
 
   test("infers remote from the location text when the adapter is unsure", () => {
-    const job = normalizeItem(item({ remote: false, location: "Remote (US)" }), "greenhouse");
+    const job = normalizeItem(item({ remote: null, location: "Remote (US)" }), "greenhouse");
     expect(job.remote).toBe(true);
     expect(job.locationKey).toBe("remote:us");
   });
 
   test("infers remote from the description when location is on-site-looking", () => {
     const job = normalizeItem(
-      item({ remote: false, location: "San Francisco, CA", description: "This is a fully remote role." }),
+      item({ remote: null, location: "San Francisco, CA", description: "This is a fully remote role." }),
       "greenhouse",
     );
     expect(job.remote).toBe(true);
@@ -56,11 +56,22 @@ describe("normalizeItem", () => {
 
   test("keeps non-remote jobs non-remote", () => {
     const job = normalizeItem(
-      item({ remote: false, location: "San Francisco, CA", description: "Onsite four days a week." }),
+      item({ remote: null, location: "San Francisco, CA", description: "Onsite four days a week." }),
       "greenhouse",
     );
     expect(job.remote).toBe(false);
     expect(job.locationKey).toBe("san francisco ca");
+  });
+
+  // Measured before the tri-state: 53 of 410 Ashby Hybrid postings were flipped remote by
+  // their own descriptions mentioning the word. An adapter that read a real workplace field
+  // has answered; prose does not overrule it.
+  test("does not let remote-sounding text overrule an authoritative non-remote", () => {
+    const job = normalizeItem(
+      item({ remote: false, location: "Remote (US)", description: "This is a fully remote role." }),
+      "ashby",
+    );
+    expect(job.remote).toBe(false);
   });
 
   test("collapses whitespace in titles and companies", () => {

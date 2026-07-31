@@ -52,10 +52,13 @@ export function normalizeItem(item: RawItem, source: SourceId): NormalizedJob {
   const location = item.location === null ? null : squash(item.location);
   const description = item.description.trim();
 
+  // An adapter that read a real workplace field has answered both ways; the text heuristics
+  // only decide when the source offered no arrangement at all. Measured before this guard:
+  // 53 of 410 Ashby Hybrid and 2 of 620 OnSite postings came back out remote.
   const remote =
-    item.remote ||
-    (location !== null && REMOTE_LOCATION.test(location)) ||
-    REMOTE_DESCRIPTION.test(description);
+    item.remote ??
+    ((location !== null && REMOTE_LOCATION.test(location)) ||
+      REMOTE_DESCRIPTION.test(description));
 
   const url = safeUrl(item.url, source);
 

@@ -228,7 +228,9 @@ export class HnAdapter implements SourceAdapter {
           company,
           title,
           location: posting.location,
-          remote: posting.remote,
+          // The extractor only affirms remote when the comment says so; false means the
+          // comment was silent, and the normalizer may still read it out of the text.
+          remote: posting.remote ? true : null,
           description: `${posting.summary}\n\n${comment.text}`,
           salaryText: posting.salaryText,
           postedAt: comment.createdAt,

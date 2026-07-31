@@ -38,7 +38,7 @@ describe("GreenhouseAdapter", () => {
     expect(first?.company).toBe("Acme AI");
     expect(first?.title).toBe("Senior Agentic Engineer");
     expect(first?.location).toBe("Remote - US");
-    expect(first?.remote).toBe(false);
+    expect(first?.remote).toBeNull();
     expect(first?.salaryText).toBeNull();
     expect(first?.postedAt).toBe("2026-07-26T19:04:00.000Z");
     expect(first?.url).toBe("https://job-boards.greenhouse.io/acmeai/jobs/5501234");

@@ -52,9 +52,9 @@ describe("ArbeitnowAdapter", () => {
     expect(first?.description).not.toContain("<p>");
   });
 
-  test("passes the remote boolean straight through for both true and false", async () => {
+  test("affirms remote but leaves false open for the text heuristics", async () => {
     const result = await new ArbeitnowAdapter().fetch(context(http(() => fixture)));
-    expect(result.items[0]?.remote).toBe(false);
+    expect(result.items[0]?.remote).toBeNull();
     expect(result.items[1]?.remote).toBe(true);
   });
 

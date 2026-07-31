@@ -176,7 +176,7 @@ export class AdzunaAdapter implements SourceAdapter {
             location: locationFor(job),
             // Adzuna serves no remote flag; the normalizer reads it out of the location and
             // snippet text instead.
-            remote: false,
+            remote: null,
             // The API returns a truncated snippet rather than the posting body, so descriptions
             // from this source are short by construction — the rubric sees roughly 200
             // characters and has to lean on title, company, location and salary.

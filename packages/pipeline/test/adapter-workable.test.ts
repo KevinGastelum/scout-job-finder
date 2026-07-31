@@ -58,7 +58,7 @@ describe("WorkableAdapter", () => {
     const second = result.items[1];
     expect(second?.title).toBe("Senior Python Software Engineer");
     expect(second?.location).toBe("France");
-    expect(second?.remote).toBe(false);
+    expect(second?.remote).toBeNull();
     expect(second?.description).toBe("Ship the SDK & keep it fast.");
   });
 

@@ -50,10 +50,11 @@ function locationNames(job: TheMuseJob): string[] {
     .filter((name) => name.length > 0);
 }
 
-// The Muse has no explicit remote flag on a posting, so remote can only be inferred
-// from a location literally naming itself "Remote" — never invented from other signals.
-function remoteFor(job: TheMuseJob): boolean {
-  return locationNames(job).some((name) => name.toLowerCase().includes("remote"));
+// The Muse has no explicit remote flag on a posting, so remote can only be affirmed
+// by a location literally naming itself "Remote"; otherwise the arrangement is unknown
+// and the normalizer's text heuristics decide.
+function remoteFor(job: TheMuseJob): boolean | null {
+  return locationNames(job).some((name) => name.toLowerCase().includes("remote")) ? true : null;
 }
 
 function urlFor(job: TheMuseJob, id: string): string {

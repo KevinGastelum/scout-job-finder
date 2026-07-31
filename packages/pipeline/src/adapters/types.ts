@@ -9,7 +9,11 @@ export interface RawItem {
   company: string;
   title: string;
   location: string | null;
-  remote: boolean;
+  // Tri-state: true/false when the source states the arrangement (a remote-only board, a
+  // workplace-type field), null when it offers no signal and the normalizer's text
+  // heuristics should decide. An authoritative false cannot be overridden by text — that
+  // is the point; hybrid postings routinely mention "remote" in prose.
+  remote: boolean | null;
   description: string;
   salaryText: string | null;
   postedAt: string | null;
