@@ -35,6 +35,9 @@ const FAMILY_RULES: FamilyRule[] = [
       // keeps "AI-Native" sales and marketing titles out.
       /\bai[\s/-](?:[\w-]+\s+){0,2}(?:engineer|developer|architect)\b/,
       /\bai\s+architect\b/,
+      // Government and enterprise boards spell it out: "Computer Scientist (Artificial
+      // Intelligence)", "Artificial Intelligence Specialist".
+      /\bartificial\s+intelligence\b/,
     ],
   },
   {

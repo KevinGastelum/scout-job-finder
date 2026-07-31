@@ -84,7 +84,7 @@ const unused = context(http(() => PAGE));
 
 describe("UsaJobsAdapter", () => {
   test("maps a search page into raw items", async () => {
-    const adapter = new UsaJobsAdapter(["data engineer"], http(() => PAGE));
+    const adapter = new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => PAGE));
     const result = await adapter.fetch(unused);
 
     expect(adapter.id).toBe("usajobs");
@@ -101,7 +101,7 @@ describe("UsaJobsAdapter", () => {
   });
 
   test("joins summary, duties and qualifications into one plain-text description", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], http(() => PAGE)).fetch(unused);
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => PAGE)).fetch(unused);
     const description = result.items[0]?.description ?? "";
 
     expect(description).toContain("Office of Prices & Living Conditions");
@@ -115,13 +115,13 @@ describe("UsaJobsAdapter", () => {
   // The API sends "2026-07-28T16:52:25.9600" — no zone and four fractional digits, which JS
   // would otherwise read as this machine's local time and shift the posting date by hours.
   test("reads the zone-less fractional timestamp as UTC", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], http(() => PAGE)).fetch(unused);
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => PAGE)).fetch(unused);
     expect(result.items[0]?.postedAt).toBe("2026-07-28T16:52:25.000Z");
     expect(result.items[1]?.postedAt).toBe("2026-07-27T00:00:00.000Z");
   });
 
   test("falls back to the department, the canonical url, and a one-sided salary", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], http(() => PAGE)).fetch(unused);
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => PAGE)).fetch(unused);
     const second = result.items[1];
 
     expect(second?.company).toBe("Department of Veterans Affairs");
@@ -133,7 +133,7 @@ describe("UsaJobsAdapter", () => {
   });
 
   test("skips an entry missing a required field and reports it", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], http(() => PAGE)).fetch(unused);
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => PAGE)).fetch(unused);
     expect(result.items.some((item) => item.sourceNativeId === "845300222")).toBe(false);
     expect(result.errors.length).toBe(1);
     expect(result.errors[0]).toContain("845300222");
@@ -141,7 +141,7 @@ describe("UsaJobsAdapter", () => {
 
   test("deduplicates a posting that surfaces under several keywords", async () => {
     const result = await new UsaJobsAdapter(
-      ["data engineer", "data scientist"],
+      [{ keyword: "data engineer" }, { keyword: "data scientist" }],
       http(() => PAGE),
     ).fetch(unused);
 
@@ -150,16 +150,43 @@ describe("UsaJobsAdapter", () => {
   });
 
   test("records the search urls without the api key", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], http(() => PAGE)).fetch(unused);
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => PAGE)).fetch(unused);
     expect(result.queries[0]).toContain("Keyword=data+engineer");
     expect(result.queries[0]).toContain("Fields=Full");
     expect(result.queries[0]).toContain("Page=1");
     expect(result.queries[0]).not.toContain("Authorization");
   });
 
+  // Occupational-series filtering goes through JobCategoryCode — PositionSeries is a response
+  // field, and the search API silently ignores it (verified live: it returns the unfiltered
+  // firehose with attorneys at the top).
+  test("filters by occupational series via JobCategoryCode", async () => {
+    const result = await new UsaJobsAdapter(
+      [{ series: ["1550", "1560"], keyword: "data" }],
+      http(() => PAGE),
+    ).fetch(unused);
+
+    expect(result.queries[0]).toContain("JobCategoryCode=1550%3B1560");
+    expect(result.queries[0]).toContain("Keyword=data");
+  });
+
+  test("labels a failing series query readably", async () => {
+    const result = await new UsaJobsAdapter([{ series: ["2210"] }], {
+      async getJson<T>(): Promise<T> {
+        throw new Error("network down");
+      },
+      async getText(): Promise<string> {
+        return "";
+      },
+    }).fetch(unused);
+
+    expect(result.errors[0]).toContain("series 2210");
+    expect(result.errors[0]).toContain("network down");
+  });
+
   test("stops paging when the page comes back short", async () => {
     let calls = 0;
-    const result = await new UsaJobsAdapter(["data engineer"], {
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], {
       async getJson<T>(): Promise<T> {
         calls += 1;
         return PAGE as T;
@@ -174,7 +201,7 @@ describe("UsaJobsAdapter", () => {
   });
 
   test("reports a fetch failure without throwing", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], {
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], {
       async getJson<T>(): Promise<T> {
         throw new Error("network down");
       },
@@ -188,7 +215,7 @@ describe("UsaJobsAdapter", () => {
   });
 
   test("reports a missing result-items array instead of throwing", async () => {
-    const result = await new UsaJobsAdapter(["data engineer"], http(() => ({}))).fetch(unused);
+    const result = await new UsaJobsAdapter([{ keyword: "data engineer" }], http(() => ({}))).fetch(unused);
     expect(result.items).toEqual([]);
     expect(result.errors[0]).toContain("no result items");
   });

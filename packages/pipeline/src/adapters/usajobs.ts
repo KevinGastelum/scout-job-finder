@@ -13,12 +13,23 @@ import {
 
 const ENDPOINT = "https://data.usajobs.gov/api/search";
 
-export const QUERIES = [
-  "data engineer",
-  "data scientist",
-  "data analyst",
-  "software engineer",
-  "machine learning",
+export interface UsaJobsQuery {
+  keyword?: string;
+  // OPM occupational series codes, filtered server-side via JobCategoryCode.
+  series?: string[];
+}
+
+// Keyword relevance search matches whole announcements, so "software engineer" returned
+// railroad safety inspectors: 585 of 598 collected postings had unclassifiable titles.
+// Federal data/AI work is filed under a handful of occupational series, and filtering on
+// those returns almost nothing but real matches.
+export const QUERIES: UsaJobsQuery[] = [
+  // 1550 computer science, 1560 data science, 0854 computer engineering, 1515 operations research
+  { series: ["1550", "1560", "0854", "1515"] },
+  // 2210 is the broad IT bucket — without a keyword it is mostly network and INFOSEC roles.
+  { series: ["2210"], keyword: "data" },
+  // AI roles occasionally sit outside the tech series entirely.
+  { keyword: "artificial intelligence" },
 ];
 
 const RESULTS_PER_PAGE = 100;
@@ -65,14 +76,26 @@ function trimmedString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function searchUrl(query: string, page: number): string {
+function searchUrl(query: UsaJobsQuery, page: number): string {
   const params = new URLSearchParams({
-    Keyword: query,
     ResultsPerPage: String(RESULTS_PER_PAGE),
     Page: String(page),
     Fields: "Full",
   });
+  if (query.keyword !== undefined) params.set("Keyword", query.keyword);
+  if (query.series !== undefined && query.series.length > 0) {
+    params.set("JobCategoryCode", query.series.join(";"));
+  }
   return `${ENDPOINT}?${params.toString()}`;
+}
+
+function describeQuery(query: UsaJobsQuery): string {
+  const parts: string[] = [];
+  if (query.series !== undefined && query.series.length > 0) {
+    parts.push(`series ${query.series.join(";")}`);
+  }
+  if (query.keyword !== undefined) parts.push(`"${query.keyword}"`);
+  return parts.join(" ") || "(empty query)";
 }
 
 // USAJobs stamps an offset-less timestamp with four fractional digits
@@ -130,7 +153,7 @@ export class UsaJobsAdapter implements SourceAdapter {
   readonly id: SourceId = "usajobs";
 
   constructor(
-    private readonly queries: string[] = QUERIES,
+    private readonly queries: UsaJobsQuery[] = QUERIES,
     private readonly http: HttpClient | null = null,
   ) {}
 
@@ -161,13 +184,17 @@ export class UsaJobsAdapter implements SourceAdapter {
         try {
           response = await http.getJson<SearchResponse>(url);
         } catch (error) {
-          errors.push(`usajobs search "${query}" page ${page} failed: ${describeError(error)}`);
+          errors.push(
+            `usajobs search ${describeQuery(query)} page ${page} failed: ${describeError(error)}`,
+          );
           break;
         }
 
         const entries: unknown = response?.SearchResult?.SearchResultItems;
         if (!Array.isArray(entries)) {
-          errors.push(`usajobs search "${query}" page ${page} returned no result items`);
+          errors.push(
+            `usajobs search ${describeQuery(query)} page ${page} returned no result items`,
+          );
           break;
         }
 

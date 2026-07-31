@@ -46,6 +46,13 @@ describe("classifyTitleFamily", () => {
     expect(classifyTitleFamily("Enterprise Application AI Architect")).toBe("ai-engineer");
   });
 
+  // Federal and enterprise boards write the words out instead of the acronym.
+  test("classifies titles that spell out artificial intelligence", () => {
+    expect(classifyTitleFamily("Computer Scientist (Artificial Intelligence)")).toBe("ai-engineer");
+    expect(classifyTitleFamily("Artificial Intelligence Specialist")).toBe("ai-engineer");
+    expect(classifyTitleFamily("Program Manager, Artificial Intelligence")).toBeNull();
+  });
+
   // The widened rule keys off an engineering noun, not the letters "AI", because the boards
   // are full of "AI-Native" sales and marketing titles that are not engineering work.
   test("does not treat every AI-flavoured title as engineering", () => {

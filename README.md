@@ -37,8 +37,8 @@ companies worth watching; the keyless aggregators give breadth without more slug
 | Jobicy | `jobicy.com/api/v2/remote-jobs` | Keyless, remote-only; flat `salaryMin`/`salaryMax` fields |
 | We Work Remotely | `weworkremotely.com/categories/{category}` | Keyless RSS per category |
 | LinkedIn | `linkedin.com/jobs-guest/jobs/api` | Guest endpoints, no key; the slowest source — 429s above ~2 req/s, so it self-paces at one detail fetch per new posting. Bodies already stored are reused, so a warm database skips most of them |
-| USAJobs | `data.usajobs.gov/api/search` | Free key; the registered email is sent as `User-Agent`, so both values are required |
-| Adzuna | `api.adzuna.com/v1/api/jobs/us/search` | Free key; aggregates Indeed/Glassdoor inventory |
+| USAJobs | `data.usajobs.gov/api/search` | Free key; the registered email is sent as `User-Agent`, so both values are required. Filters by OPM occupational series (`JobCategoryCode`) rather than keyword relevance, which matched whole announcements and returned railroad inspectors |
+| Adzuna | `api.adzuna.com/v1/api/jobs/us/search` | Free key; aggregates Indeed/Glassdoor inventory. The API truncates every description at 500 characters, so rubric scores cap out mid-range — treat it as a discovery feed and read the posting behind `redirect_url` |
 | HN Who's Hiring | `hn.algolia.com/api/v1` | Free-form comments, LLM-extracted and cached |
 
 USAJobs and Adzuna each skip with a message when their keys are unset; the other thirteen need

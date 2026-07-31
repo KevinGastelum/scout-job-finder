@@ -148,6 +148,16 @@ Reported and rejected after checking the shipped code — recorded so they don't
   fork-heavy first two pages could stop pagination below 120 eligible repos. Unreachable at
   the current 79 owned repos; revisit if the account grows past ~200.
 
+## From the Adzuna/USAJobs yield investigation (2026-07-31)
+- No `data-scientist` title family exists, so federal series-1560 "Data Scientist" postings (and
+  every other board's) die at `role-family:unclassified`. Adding the family touches the
+  `TitleFamily` union, the rules, the query terms, and `profile/profile.md`'s target list — and
+  the profile edit invalidates the whole rubric cache, so batch it with the next profile change
+  rather than paying a full re-score for one family.
+- Adzuna descriptions are hard-truncated at 500 chars by the API (avg 499 across 751 rows), so
+  its rubric scores plateau in the 50s–60s from thin evidence. Structural; fetching full text
+  would mean scraping each `redirect_url` target. Documented in the README instead.
+
 ## From the Himalayas coverage fix (2026-07-30)
 - A scoped sweep never expires a posting older than the covered window, so Himalayas jobs first
   collected under the old 100-job cap stay `active` indefinitely even once they are delisted.
