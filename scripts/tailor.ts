@@ -51,9 +51,11 @@ console.log(`tailoring for ${job.title} at ${job.company} (${job.url})`);
 
 const result = await tailorForJob(rubricLlmFromEnv(), job, profile, score, positioning);
 
-// Board-supplied text goes into an HTML comment; "--" would terminate it early.
+// Board-supplied text goes into an HTML comment, and any "--" can end one ("--!>" is a
+// closer too). Prose gets an em dash; the url percent-encodes, which decodes to the same
+// address.
 const safe = (value: string) => value.replaceAll("--", "—");
-const header = `<!-- ${safe(job.title)} @ ${safe(job.company)} · job ${jobId} · ${job.url.replaceAll("-->", "")} -->\n\n`;
+const header = `<!-- ${safe(job.title)} @ ${safe(job.company)} · job ${jobId} · ${job.url.replaceAll("--", "%2D%2D")} -->\n\n`;
 await Bun.write(`${dir}/resume-slant.md`, header + result.resumeSlant.trim() + "\n");
 await Bun.write(
   `${dir}/cover-letter.md`,
