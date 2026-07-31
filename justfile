@@ -23,6 +23,13 @@ serve:
 	bun run web:build
 	bun run serve
 
+# Build the dashboard, open it in the default browser, then serve it. The browser launches a
+# beat before the server binds; the tab loads by the time it is in the foreground.
+dashboard:
+	bun run web:build
+	cmd //c start '' http://127.0.0.1:8787
+	bun run serve
+
 dev:
 	bun run web:dev
 
