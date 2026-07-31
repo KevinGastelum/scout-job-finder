@@ -69,5 +69,9 @@ function Invoke-Step {
 $scanOk = Invoke-Step 'scan'
 $intelOk = Invoke-Step 'intel'
 
-if ($scanOk -and $intelOk) { exit 0 }
+# doctor last, so its verdict describes the state this run left behind. Its non-zero exit is
+# what turns a quietly degraded scan into a FAIL line in the log.
+$doctorOk = Invoke-Step 'doctor'
+
+if ($scanOk -and $intelOk -and $doctorOk) { exit 0 }
 exit 1

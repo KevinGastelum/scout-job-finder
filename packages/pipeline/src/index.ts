@@ -1,5 +1,6 @@
 import {
   MAX_MISSED_RUNS,
+  failStaleRuns,
   findDescriptionsBySourceIds,
   finishRun,
   insertRawPosting,
@@ -42,6 +43,7 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
   const adapterLlm = options.adapterLlm ?? llm;
   const now = options.now ?? (() => new Date());
   const startedAt = now().toISOString();
+  failStaleRuns(db, now());
   const runId = startRun(db, startedAt);
   const stats: SourceStats[] = [];
 
@@ -125,6 +127,7 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
   return { runId, stats, scored: funnel?.scored ?? 0, funnel };
 }
 
+export { runDoctor, type DoctorCheck, type DoctorLevel, type DoctorReport } from "./doctor";
 export { AdzunaAdapter, QUERIES as ADZUNA_QUERIES, adzunaCredentials } from "./adapters/adzuna";
 export { ArbeitnowAdapter } from "./adapters/arbeitnow";
 export { AshbyAdapter } from "./adapters/ashby";

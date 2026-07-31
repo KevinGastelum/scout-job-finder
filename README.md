@@ -69,6 +69,7 @@ Other commands:
 ```bash
 bun run score           # re-run the funnel over the stored jobs; 0 network
 bun run export          # write the ranked shortlist to profile/shortlist.csv
+bun run doctor          # one-screen health check; exits non-zero when something is wrong
 bun run intel           # rank skill demand across collected postings; 0 network, 0 LLM
 bun test
 bun run typecheck

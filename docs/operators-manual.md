@@ -32,7 +32,7 @@ powershell -ExecutionPolicy Bypass -File scripts\register-daily-scan.ps1
 ```
 
 - Defaults to 07:00 daily. `-At 06:30` moves it, `-Unregister` removes it, re-running replaces it.
-- Runs `bun run scan` then `bun run intel`, appending both to `.tmp/daily-scan.log` (gitignored). `intel` runs even if the scan reported source errors, because a partial scan still collected most boards.
+- Runs `bun run scan`, then `bun run intel`, then `bun run doctor`, appending all three to `.tmp/daily-scan.log` (gitignored). `intel` runs even if the scan reported source errors, because a partial scan still collected most boards. `doctor` runs last so the log ends with a verdict on the state the run left behind — a `FAIL doctor` line is the signal to open the log rather than trust the shortlist is fresh.
 - A missed run (machine asleep at 07:00) fires when the machine next wakes rather than being skipped.
 - **It only runs while you're logged on.** The scan shells out to the `claude` CLI, which needs your logged-in session — running the task as SYSTEM or with stored credentials would find no authentication.
 - Force a run now: `Start-ScheduledTask -TaskName 'Scout Daily Scan'`. Check the last result: `Get-ScheduledTaskInfo -TaskName 'Scout Daily Scan'`.
@@ -100,6 +100,7 @@ One aggregator asks for credit in its terms, and the ask is about *republishing*
 | `just scan` / `just daily` (`bun run scan`) | Fetches postings from Remotive, Greenhouse, Lever, Ashby, Workable, Teamtailor, We Work Remotely, The Muse, Arbeitnow, Himalayas, Jobicy, LinkedIn, USAJobs, Adzuna, and HN, deduplicates, and scores candidates | Source job APIs + up to 250 `claude` LLM rubric calls, 5 at a time. Only postings new since the last scan cost a call — the rest come from cache. USAJobs and Adzuna each skip with a message if their keys are unset — the rest of the scan is unaffected |
 | `bun run score` | Re-runs the funnel over the jobs already collected, without fetching anything | Up to 250 `claude` rubric calls, 5 at a time. 0 network |
 | `bun run export [path] [limit]` | Writes the ranked shortlist to `profile\shortlist.csv` — score, company, title, `source`, location, `status`, derived `stage` and `next_action`, `applied_at`, salary, `also_posted_in`, url | Local only (0 network / 0 LLM) |
+| `bun run doctor` | One-screen health check: profile compiled, last-run age, aborted runs, per-source freshness and errors from the last scan, unscored backlog, failed rubric calls, shortlist size, database size. Exits non-zero on a failing check | Local only (0 network / 0 LLM) |
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
 | `bun run scripts/discover-board.ts [Name=domain ...]` | Finds the applicant tracking system behind a company's careers page: fingerprints the HTML, falls back to its JS bundles, reports any embedded posting JSON, then probes every keyless board API for the likely tokens. With no arguments it runs the `verified: false` seed rows | Careers page + up to 12 bundles + one probe per provider/token pair, paced at 300ms. 0 LLM |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |

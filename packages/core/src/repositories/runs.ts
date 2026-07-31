@@ -48,6 +48,20 @@ export function finishRun(
   ]);
 }
 
+// A crashed scan leaves its row at 'running' forever, indistinguishable from one mid-flight.
+// Anything open this long is a corpse — a full scan finishes in well under an hour.
+export const STALE_RUN_HOURS = 6;
+
+export function failStaleRuns(db: Database, now: Date): number {
+  const cutoff = new Date(now.getTime() - STALE_RUN_HOURS * 3_600_000).toISOString();
+  return db.run(
+    `UPDATE runs SET status = 'failed', finished_at = ?,
+       error = COALESCE(error, 'never finished; marked failed at next startup')
+     WHERE status = 'running' AND started_at < ?`,
+    [now.toISOString(), cutoff],
+  ).changes;
+}
+
 export function getLatestRun(db: Database): RunRecord | null {
   const row = db
     .query<RunRow, []>("SELECT * FROM runs ORDER BY id DESC LIMIT 1")

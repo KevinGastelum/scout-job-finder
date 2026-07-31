@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { openDb } from "../src/db";
-import { finishRun, getLatestRun, startRun } from "../src/repositories/runs";
+import { failStaleRuns, finishRun, getLatestRun, startRun } from "../src/repositories/runs";
 import { insertRawPosting } from "../src/repositories/raw-postings";
 import type { SourceStats } from "../src/types";
 
@@ -41,6 +41,35 @@ describe("runs repository", () => {
     const runId = startRun(db, "2026-07-28T10:00:00.000Z");
     finishRun(db, runId, "failed", [], "2026-07-28T10:00:01.000Z", "disk full");
     expect(getLatestRun(db)?.error).toBe("disk full");
+    db.close();
+  });
+
+  test("marks only long-abandoned running rows failed", async () => {
+    const db = await openDb(":memory:");
+    const corpse = startRun(db, "2026-07-28T02:00:00.000Z");
+    const live = startRun(db, "2026-07-28T09:30:00.000Z");
+
+    const changed = failStaleRuns(db, new Date("2026-07-28T10:00:00.000Z"));
+    expect(changed).toBe(1);
+
+    const rows = db
+      .query<{ id: number; status: string; error: string | null }, []>(
+        "SELECT id, status, error FROM runs ORDER BY id",
+      )
+      .all();
+    expect(rows.find((row) => row.id === corpse)?.status).toBe("failed");
+    expect(rows.find((row) => row.id === corpse)?.error).toContain("never finished");
+    expect(rows.find((row) => row.id === live)?.status).toBe("running");
+    db.close();
+  });
+
+  test("keeps the original error of a stale run that recorded one", async () => {
+    const db = await openDb(":memory:");
+    const runId = startRun(db, "2026-07-28T02:00:00.000Z");
+    db.run("UPDATE runs SET error = 'adapter blew up' WHERE id = ?", [runId]);
+
+    failStaleRuns(db, new Date("2026-07-28T10:00:00.000Z"));
+    expect(getLatestRun(db)?.error).toBe("adapter blew up");
     db.close();
   });
 });
