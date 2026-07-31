@@ -48,14 +48,10 @@ salary tier masking a usable summary, a non-array `jobs` field throwing, the tok
 accepting `.` and `..`, and `verify-boards` passing any HTTP 200.
 
 Deferred, in priority order:
-- **`RawItem.remote` cannot express "authoritatively not remote".** The Ashby adapter reads
-  Ashby's `workplaceType` discriminator correctly, then `normalizeItem` re-derives remote from
-  location/description text and can only ADD remotes. Measured against live data: 53 of 410
-  Hybrid and 2 of 620 OnSite postings come back out as `remote: true`. Needs a tri-state or an
-  authoritative-remote flag on `RawItem`, with text heuristics applying only when the provider
-  gave no arrangement. Touches all five adapters plus the normalizer. Impact is currently
-  bounded: the profile has `remoteOnly: false`, so the hard filter never keys off the flag and
-  the only consumer is the rubric prompt (whose results are cached per description hash).
+- ~~**`RawItem.remote` cannot express "authoritatively not remote".**~~ Fixed 2026-07-31:
+  `RawItem.remote` is `boolean | null`; Ashby/Lever workplace fields are authoritative both
+  ways, remote-only boards assert true, everything else passes null and the normalizer's text
+  heuristics decide only then. Stored rows correct themselves as each posting is re-fetched.
 - **`sweepMissingJobs` is not scoped to the boards that actually answered.** `runScan` sweeps the
   whole source after a partial failure, so jobs on a board that 404'd or timed out accrue missed
   runs and expire after three, even while the board is healthy. Pre-existing and affects
