@@ -128,6 +128,13 @@ export async function runScan(options: ScanOptions): Promise<ScanSummary> {
 }
 
 export { runDoctor, type DoctorCheck, type DoctorLevel, type DoctorReport } from "./doctor";
+export {
+  TAILOR_PROMPT_VERSION,
+  TailorResultSchema,
+  buildTailorPrompt,
+  tailorForJob,
+  type TailorResult,
+} from "./tailor";
 export { AdzunaAdapter, QUERIES as ADZUNA_QUERIES, adzunaCredentials } from "./adapters/adzuna";
 export { ArbeitnowAdapter } from "./adapters/arbeitnow";
 export { AshbyAdapter } from "./adapters/ashby";

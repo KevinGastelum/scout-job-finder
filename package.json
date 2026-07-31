@@ -8,6 +8,7 @@
     "score": "bun run scripts/score.ts",
     "export": "bun run scripts/export.ts",
     "doctor": "bun run scripts/doctor.ts",
+    "tailor": "bun run scripts/tailor.ts",
     "profile": "bun run scripts/compile-profile.ts",
     "ingest": "bun run scripts/ingest-profile.ts && bun run profile",
     "intel": "bun run scripts/intel.ts",

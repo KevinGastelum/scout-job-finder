@@ -21,7 +21,10 @@ Practical runbook for the single human operator (Kevin).
 2. **Open dashboard**: Navigate to http://127.0.0.1:8787.
 3. **Review shortlist**: Review the ranked shortlist along with cited evidence for every match decision.
 4. **Triage candidates**: Update job statuses (`shortlisted`, `dismissed`, `applied`).
-5. **Apply**: Apply to top matching positions manually via direct job links.
+5. **Draft materials**: `bun run tailor <job_id>` for each shortlisted role worth applying to.
+   Read the draft once — especially its gaps list — before sending anything.
+6. **Apply**: Apply to top matching positions manually via direct job links, then set the
+   status to `applied` so the tracker knows the ball is with them.
 
 ### Running it unattended (Windows)
 
@@ -101,6 +104,7 @@ One aggregator asks for credit in its terms, and the ask is about *republishing*
 | `bun run score` | Re-runs the funnel over the jobs already collected, without fetching anything | Up to 250 `claude` rubric calls, 5 at a time. 0 network |
 | `bun run export [path] [limit]` | Writes the ranked shortlist to `profile\shortlist.csv` — score, company, title, `source`, location, `status`, derived `stage` and `next_action`, `applied_at`, salary, `also_posted_in`, url | Local only (0 network / 0 LLM) |
 | `bun run doctor` | One-screen health check: profile compiled, last-run age, aborted runs, per-source freshness and errors from the last scan, unscored backlog, failed rubric calls, shortlist size, database size. Exits non-zero on a failing check | Local only (0 network / 0 LLM) |
+| `bun run tailor <job_id> [--force]` | Drafts `resume-slant.md` and `cover-letter.md` (plus talking points and a gaps list) into `profile\applications\<job>\`, grounded in the profile, the posting, and the rubric's quoted evidence; advances `shortlisted` → `tailored` | One `claude` call |
 | `just intel` (`bun run intel`) | Ranks skill demand across the collected postings and appends new gaps to the roadmap | Local only (0 network / 0 LLM) |
 | `bun run scripts/discover-board.ts [Name=domain ...]` | Finds the applicant tracking system behind a company's careers page: fingerprints the HTML, falls back to its JS bundles, reports any embedded posting JSON, then probes every keyless board API for the likely tokens. With no arguments it runs the `verified: false` seed rows | Careers page + up to 12 bundles + one probe per provider/token pair, paced at 300ms. 0 LLM |
 | `just serve` (`bun run web:build && bun run serve`) | Builds Vite frontend bundle and starts local Bun HTTP API & dashboard server | Local only (0 network/LLM cost) |
