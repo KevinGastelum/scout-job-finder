@@ -31,10 +31,11 @@ if (job === null) {
 
 const slug = job.companyNormalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const dir = `profile/applications/${jobId}-${slug}`;
-const letterFile = Bun.file(`${dir}/cover-letter.md`);
-if (!force && (await letterFile.exists())) {
-  console.error(`${dir} already has a draft — re-run with --force to overwrite it`);
-  process.exit(1);
+for (const name of ["resume-slant.md", "cover-letter.md"]) {
+  if (!force && (await Bun.file(`${dir}/${name}`).exists())) {
+    console.error(`${dir}/${name} already exists — re-run with --force to overwrite the draft`);
+    process.exit(1);
+  }
 }
 
 // Optional one-paragraph identity statement, e.g. "the job equivalent of a Claude architect".
@@ -42,12 +43,17 @@ if (!force && (await letterFile.exists())) {
 const positioningFile = Bun.file("profile/positioning.md");
 const positioning = (await positioningFile.exists()) ? (await positioningFile.text()).trim() : null;
 
-const score = getScore(db, jobId, RUBRIC_VERSION);
+// A score from an older profile version judged different target roles; better no prior
+// evaluation than a stale one steering the letter.
+const storedScore = getScore(db, jobId, RUBRIC_VERSION);
+const score = storedScore?.profileVersion === profile.version ? storedScore : null;
 console.log(`tailoring for ${job.title} at ${job.company} (${job.url})`);
 
 const result = await tailorForJob(rubricLlmFromEnv(), job, profile, score, positioning);
 
-const header = `<!-- ${job.title} @ ${job.company} · job ${jobId} · ${job.url} -->\n\n`;
+// Board-supplied text goes into an HTML comment; "--" would terminate it early.
+const safe = (value: string) => value.replaceAll("--", "—");
+const header = `<!-- ${safe(job.title)} @ ${safe(job.company)} · job ${jobId} · ${job.url.replaceAll("-->", "")} -->\n\n`;
 await Bun.write(`${dir}/resume-slant.md`, header + result.resumeSlant.trim() + "\n");
 await Bun.write(
   `${dir}/cover-letter.md`,
@@ -59,8 +65,9 @@ await Bun.write(
     (result.gaps.length === 0 ? "- none identified\n" : result.gaps.map((gap) => `- ${gap}`).join("\n") + "\n"),
 );
 
-// Drafting is what "tailored" means; statuses further along (applied, interview) are the
-// operator's record of real-world events and are never walked backwards.
+// Drafting is what "tailored" means, and running this command IS the review — so an
+// untracked job advances too, not only a shortlisted one. Statuses further along
+// (applied, interview) record real-world events and are never walked backwards.
 const status = getApplication(db, jobId)?.status ?? null;
 if (status === null || status === "shortlisted") {
   setApplicationStatus(db, jobId, "tailored", new Date().toISOString());

@@ -135,6 +135,23 @@ describe("doctor", () => {
     db.close();
   });
 
+  // The reachable trap: score runs complete with empty stats, so "a run completed
+  // recently" can be true while nothing has fetched postings for days.
+  test("fails on a stale scan even when a fresh score-only run completed", async () => {
+    const db = await openDb(":memory:");
+    const scanId = startRun(db, "2026-07-27T11:00:00.000Z");
+    seedJob(db, scanId, "a", 90);
+    finishRun(db, scanId, "completed", [stats()], "2026-07-27T11:05:00.000Z", null);
+    const scoreId = startRun(db, "2026-07-30T11:30:00.000Z");
+    finishRun(db, scoreId, "completed", [], "2026-07-30T11:35:00.000Z", null);
+
+    const report = runDoctor(db, { profileVersion: PROFILE_VERSION, dbBytes: 1_000, now: NOW });
+    expect(byLabel(report.checks, "last run")?.level).toBe("ok");
+    expect(byLabel(report.checks, "last scan")?.level).toBe("fail");
+    expect(report.healthy).toBe(false);
+    db.close();
+  });
+
   test("grades the last completed run by age", async () => {
     const db = await openDb(":memory:");
     const runId = startRun(db, "2026-07-28T11:00:00.000Z");

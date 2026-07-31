@@ -86,8 +86,9 @@ invalidates every stored score, and re-scoring shouldn't require re-fetching fif
 quoted evidence — anything the posting wants that the profile lacks lands in the gaps list
 rather than in an invented sentence. An optional `profile/positioning.md` states the identity
 to write toward; editing it never invalidates the rubric cache. One LLM call per run; it
-refuses to overwrite an existing draft without `--force`, and advances a `shortlisted` job to
-`tailored` on success.
+refuses to overwrite an existing draft without `--force`, and on success marks the job
+`tailored` — from untracked or `shortlisted`; a status recording a later real-world event
+(`applied`, `interview`, …) is never walked backwards.
 
 `export` takes an optional path and row cap: `bun run export out.csv 100`. It includes dismissed
 rows so the file is a full record rather than a view, and lands in gitignored `profile/` because a

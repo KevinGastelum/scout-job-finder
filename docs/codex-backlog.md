@@ -154,6 +154,20 @@ Reported and rejected after checking the shipped code — recorded so they don't
   its rubric scores plateau in the 50s–60s from thin evidence. Structural; fetching full text
   would mean scraping each `redirect_url` target. Documented in the README instead.
 
+## From the Codex audit of doctor/usajobs/tri-state/tailor (2026-07-31)
+Fixed the same day: doctor grades the last *scan*'s age (a fresh score-only run no longer
+masks a stale scan); the spelled-out-AI taxonomy rule requires a role noun (tutors and
+privacy counsel no longer classify); `tailor --force` guards both output files; a stale
+rubric score (older profile version) is dropped rather than steering the letter; `--` in
+board-supplied title/company is escaped out of the draft's HTML-comment header.
+
+Deferred:
+- Doctor's 250 unscored-backlog threshold is static while the real budget is
+  `SCOUT_RUBRIC_BUDGET`-configurable; read the env in doctor if the default ever changes.
+- Codex wanted `tailor` to advance only `shortlisted` jobs, treating an untracked job as
+  un-reviewed. Kept advancing from untracked too — deliberately running the command is the
+  review — and aligned the docs to say so. Revisit if mistaken drafts start appearing.
+
 ## From the Himalayas coverage fix (2026-07-30)
 - A scoped sweep never expires a posting older than the covered window, so Himalayas jobs first
   collected under the old 100-job cap stay `active` indefinitely even once they are delisted.

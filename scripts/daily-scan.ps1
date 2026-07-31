@@ -69,8 +69,9 @@ function Invoke-Step {
 $scanOk = Invoke-Step 'scan'
 $intelOk = Invoke-Step 'intel'
 
-# doctor last, so its verdict describes the state this run left behind. Its non-zero exit is
-# what turns a quietly degraded scan into a FAIL line in the log.
+# doctor last, so its verdict describes the state this run left behind. Its non-zero exit
+# turns a stalled pipeline (no fresh scan, no profile) into a FAIL line; per-source
+# degradation shows up as ! warning lines inside the logged report.
 $doctorOk = Invoke-Step 'doctor'
 
 if ($scanOk -and $intelOk -and $doctorOk) { exit 0 }

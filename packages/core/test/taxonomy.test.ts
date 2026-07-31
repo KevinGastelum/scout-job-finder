@@ -46,11 +46,17 @@ describe("classifyTitleFamily", () => {
     expect(classifyTitleFamily("Enterprise Application AI Architect")).toBe("ai-engineer");
   });
 
-  // Federal and enterprise boards write the words out instead of the acronym.
+  // Federal and enterprise boards write the words out instead of the acronym. The bare
+  // phrase is not enough — these titles also belong to tutors and lawyers (both found in
+  // live data), so a role noun is required on one side or the other.
   test("classifies titles that spell out artificial intelligence", () => {
     expect(classifyTitleFamily("Computer Scientist (Artificial Intelligence)")).toBe("ai-engineer");
     expect(classifyTitleFamily("Artificial Intelligence Specialist")).toBe("ai-engineer");
     expect(classifyTitleFamily("Program Manager, Artificial Intelligence")).toBeNull();
+    expect(classifyTitleFamily("Artificial Intelligence Tutor")).toBeNull();
+    expect(
+      classifyTitleFamily("Artificial Intelligence and Privacy Associate General Counsel"),
+    ).toBeNull();
   });
 
   // The widened rule keys off an engineering noun, not the letters "AI", because the boards

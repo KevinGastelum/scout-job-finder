@@ -35,7 +35,7 @@ powershell -ExecutionPolicy Bypass -File scripts\register-daily-scan.ps1
 ```
 
 - Defaults to 07:00 daily. `-At 06:30` moves it, `-Unregister` removes it, re-running replaces it.
-- Runs `bun run scan`, then `bun run intel`, then `bun run doctor`, appending all three to `.tmp/daily-scan.log` (gitignored). `intel` runs even if the scan reported source errors, because a partial scan still collected most boards. `doctor` runs last so the log ends with a verdict on the state the run left behind — a `FAIL doctor` line is the signal to open the log rather than trust the shortlist is fresh.
+- Runs `bun run scan`, then `bun run intel`, then `bun run doctor`, appending all three to `.tmp/daily-scan.log` (gitignored). `intel` runs even if the scan reported source errors, because a partial scan still collected most boards. `doctor` runs last so the log ends with a verdict on the state the run left behind — a `FAIL doctor` line means the pipeline itself is stalled (no fresh scan, no profile); per-source degradation appears as `!` warning lines inside the report without failing the task.
 - A missed run (machine asleep at 07:00) fires when the machine next wakes rather than being skipped.
 - **It only runs while you're logged on.** The scan shells out to the `claude` CLI, which needs your logged-in session — running the task as SYSTEM or with stored credentials would find no authentication.
 - Force a run now: `Start-ScheduledTask -TaskName 'Scout Daily Scan'`. Check the last result: `Get-ScheduledTaskInfo -TaskName 'Scout Daily Scan'`.

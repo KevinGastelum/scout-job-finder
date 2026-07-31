@@ -75,11 +75,20 @@ export function runDoctor(db: Database, options: DoctorOptions): DoctorReport {
     push("ok", "runs", `${running.length} in progress`);
   }
 
+  // A score run completes with stats '[]', so "some run completed recently" says nothing
+  // about whether postings are still being collected. The scan's own age is what fails.
   const lastScan = db
-    .query<{ id: number; stats: string }, []>(
-      "SELECT id, stats FROM runs WHERE stats != '[]' ORDER BY id DESC LIMIT 1",
+    .query<{ id: number; stats: string; finished_at: string | null }, []>(
+      "SELECT id, stats, finished_at FROM runs WHERE status = 'completed' AND stats != '[]' ORDER BY id DESC LIMIT 1",
     )
     .get();
+  if (lastScan === null) {
+    push("fail", "last scan", "no completed scan — run `bun run scan`");
+  } else if (lastScan.finished_at !== null) {
+    const age = hoursSince(lastScan.finished_at, now);
+    const level = age > RUN_FAIL_HOURS ? "fail" : age > RUN_WARN_HOURS ? "warn" : "ok";
+    push(level, "last scan", `#${lastScan.id} completed ${age.toFixed(1)}h ago`);
+  }
   const activeBySource = new Map(
     db
       .query<{ source: string; n: number; seen: string | null }, []>(
@@ -88,9 +97,7 @@ export function runDoctor(db: Database, options: DoctorOptions): DoctorReport {
       .all()
       .map((row) => [row.source, row]),
   );
-  if (lastScan === null) {
-    push("warn", "sources", "no scan has recorded source stats yet");
-  } else {
+  if (lastScan !== null) {
     const stats = JSON.parse(lastScan.stats) as SourceStats[];
     const problems: string[] = [];
     for (const stat of stats) {

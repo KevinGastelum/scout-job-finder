@@ -36,8 +36,10 @@ const FAMILY_RULES: FamilyRule[] = [
       /\bai[\s/-](?:[\w-]+\s+){0,2}(?:engineer|developer|architect)\b/,
       /\bai\s+architect\b/,
       // Government and enterprise boards spell it out: "Computer Scientist (Artificial
-      // Intelligence)", "Artificial Intelligence Specialist".
-      /\bartificial\s+intelligence\b/,
+      // Intelligence)", "Artificial Intelligence Specialist". A role noun is required on
+      // either side — the bare phrase also titles tutors and privacy counsel.
+      /\bartificial\s+intelligence\b.*\b(?:engineer|developer|architect|scientist|specialist)\b/,
+      /\b(?:engineer|developer|architect|scientist|specialist)\b.*\bartificial\s+intelligence\b/,
     ],
   },
   {
