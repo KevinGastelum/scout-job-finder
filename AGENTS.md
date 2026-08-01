@@ -16,8 +16,26 @@ Wait for an explicit go.
 
 ## Session end — persist before stopping
 
-Update `STATUS.md`, `TODO.md`, and `TASKS.md` to match reality, in a commit. A session
-that ends without updating them didn't end — it evaporated.
+Update `STATUS.md`, `TODO.md`, `TASKS.md`, and `CHANGELOG.md` to match reality, in a
+commit. A session that ends without updating them didn't end — it evaporated.
+
+## Doc update matrix — the checks and balances
+
+Every kind of change names the docs it must touch, in the same commit as the change.
+`test/docs-links.test.ts` enforces the graph mechanically: a dangling reference or a
+missing continuity doc fails `bun test`, so doc drift breaks the build, not the next
+session.
+
+| When you change… | Update in the same commit |
+| --- | --- |
+| Behavior, commands, or env vars | `README.md` + `docs/operators-manual.md` |
+| Architecture or an invariant | `SPEC.md` + a `DECISIONS.md` entry |
+| Scope, phases, or priorities | `ROADMAP.md` / `TODO.md` |
+| Anything a future session must know to not repeat a mistake | `HANDOFF.md` |
+| Security posture or a refusal boundary | `SECURITY.md` |
+| An audit finding (fixed, deferred, or rejected) | `docs/codex-backlog.md` disposition |
+| A unit of work starting or finishing | `TASKS.md` |
+| Session ends | `STATUS.md`, `TODO.md`, `TASKS.md`, `CHANGELOG.md` |
 
 ## Working agreements
 

@@ -55,3 +55,5 @@ the expensive judgement sees only what earned it.
 Codex audit at every milestone before push, with every finding dispositioned in
 `docs/codex-backlog.md` (fixed / deferred-with-reason / rejected-with-evidence).
 `bun run doctor` is the operational gate: non-zero exit means the pipeline is stalled.
+The doc graph is enforced too — `test/docs-links.test.ts` fails on any dangling
+cross-reference, and `AGENTS.md`'s update matrix binds change types to the docs they touch.

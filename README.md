@@ -165,7 +165,10 @@ so that claim is verifiable rather than decorative:
 | [`ROADMAP.md`](ROADMAP.md) | Phases, exit criteria, and the standing scope boundary |
 | [`STATUS.md`](STATUS.md) / [`TODO.md`](TODO.md) / [`TASKS.md`](TASKS.md) | Live state, prioritized next work, and the durable ledger of what shipped — updated every session |
 | [`HANDOFF.md`](HANDOFF.md) | How to work here without re-hitting known sharp edges |
-| [`AGENTS.md`](AGENTS.md) | The operating agreements every AI session works under: definition of done, audit gate, scope discipline, hard boundaries |
+| [`AGENTS.md`](AGENTS.md) | The operating agreements every AI session works under: definition of done, audit gate, scope discipline, hard boundaries — plus the doc-update matrix that keeps this table honest |
+| [`DECISIONS.md`](DECISIONS.md) | ADR-lite log: every decision that had real alternatives, including one where the AI auditor dissented in writing |
+| [`SECURITY.md`](SECURITY.md) | The actual threat model — prompt injection, DNS rebinding, spreadsheet injection — and what this project refuses to build |
+| [`CHANGELOG.md`](CHANGELOG.md) | Arc-level history, one entry per session |
 | [`docs/codex-backlog.md`](docs/codex-backlog.md) | Every audit finding with a written disposition — fixed, deferred with reason, or rejected with evidence |
 | [`docs/operators-manual.md`](docs/operators-manual.md) | The runbook: cadence, what each command costs, troubleshooting |
 
@@ -176,6 +179,11 @@ why. The commit history shows the loop running — audit rounds, same-day fixes,
 documented disagreement resolved in writing. Alongside it: 600+ tests, strict TypeScript,
 append-only migrations, and `bun run doctor` as a non-zero-exit health gate wired into the
 scheduled daily run.
+
+The documentation itself is under test: `test/docs-links.test.ts` fails the suite if any
+doc in this table goes missing or any cross-reference dangles, and the update matrix in
+[`AGENTS.md`](AGENTS.md) binds each kind of code change to the docs it must touch in the
+same commit. Doc drift breaks the build here, not the next reader.
 
 ## Data handling
 
