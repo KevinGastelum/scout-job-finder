@@ -136,15 +136,16 @@ export function createApp(deps: AppDeps): AppHandler {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       if (scanning) return json({ error: "a scan is already running" }, 409);
       scanning = true;
-      try {
-        const { runId } = await deps.startScan();
-        return json({ runId }, 202);
-      } catch (error) {
-        console.error("scan failed:", error);
-        return json({ error: "scan failed — check server logs" }, 500);
-      } finally {
-        scanning = false;
-      }
+      // Detached on purpose: a scan takes the better part of an hour, and a response that
+      // only arrives when it ends is indistinguishable from a hang. Progress and the
+      // outcome are visible at /api/runs/latest; runScan records its own failure.
+      void deps
+        .startScan()
+        .catch((error) => console.error("scan failed:", error))
+        .finally(() => {
+          scanning = false;
+        });
+      return json({ started: true }, 202);
     }
 
     const draftsMatch = DRAFTS_ROUTE.exec(path);

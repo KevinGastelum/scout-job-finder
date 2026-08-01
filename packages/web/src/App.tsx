@@ -215,6 +215,15 @@ export default function App() {
     void reload();
   }, [reload]);
 
+  // A scan runs detached for the better part of an hour; polling while one is live keeps
+  // the run line and the button honest without hammering an idle server.
+  const scanRunning = run?.status === "running";
+  useEffect(() => {
+    if (!scanRunning) return;
+    const timer = setInterval(() => void reload(), 30_000);
+    return () => clearInterval(timer);
+  }, [scanRunning, reload]);
+
   const onStatus = useCallback(
     (jobId: number, status: ApplicationStatus) => {
       void (async () => {
@@ -292,8 +301,8 @@ export default function App() {
             />{" "}
             show dismissed
           </label>
-          <button type="button" onClick={onScan} disabled={busy}>
-            {busy ? "scanning…" : "Run scan"}
+          <button type="button" onClick={onScan} disabled={busy || scanRunning}>
+            {scanRunning ? "scanning…" : busy ? "starting…" : "Run scan"}
           </button>
         </div>
       </header>

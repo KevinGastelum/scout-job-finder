@@ -35,9 +35,10 @@ export async function setStatus(jobId: number, status: ApplicationStatus): Promi
   );
 }
 
-export async function triggerRun(): Promise<number> {
-  const body = await readJson<{ runId: number }>(await fetch("/api/run", { method: "POST" }));
-  return body.runId;
+export async function triggerRun(): Promise<void> {
+  // 202 comes back immediately; the scan itself runs detached and reports through
+  // /api/runs/latest.
+  await readJson<unknown>(await fetch("/api/run", { method: "POST" }));
 }
 
 export interface Draft {

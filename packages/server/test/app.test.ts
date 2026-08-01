@@ -182,50 +182,52 @@ describe("server app", () => {
     db.close();
   });
 
-  test("POST /api/run triggers a scan and returns its id", async () => {
-    const { db } = await seed();
-    let calls = 0;
-    const response = await appFor(db, async () => {
-      calls += 1;
-      return { runId: 42 };
-    })(new Request("http://localhost/api/run", { method: "POST" }));
-
-    expect(response.status).toBe(202);
-    expect(((await response.json()) as { runId: number }).runId).toBe(42);
-    expect(calls).toBe(1);
-    db.close();
-  });
-
-  test("POST /api/run refuses to start a second concurrent scan", async () => {
+  // The response must not wait for the scan: an hour-long request is indistinguishable
+  // from a hang, which is exactly how run 17's silent death went unnoticed.
+  test("POST /api/run answers 202 immediately while the scan keeps running", async () => {
     const { db } = await seed();
     let release = (): void => {};
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    let calls = 0;
     const app = appFor(db, async () => {
+      calls += 1;
       await gate;
       return { runId: 42 };
     });
 
-    const first = app(new Request("http://localhost/api/run", { method: "POST" }));
+    const response = await app(new Request("http://localhost/api/run", { method: "POST" }));
+    expect(response.status).toBe(202);
+    expect(((await response.json()) as { started: boolean }).started).toBe(true);
+    expect(calls).toBe(1);
+
     const second = await app(new Request("http://localhost/api/run", { method: "POST" }));
     expect(second.status).toBe(409);
 
     release();
-    expect((await first).status).toBe(202);
+    await gate;
+    // The single-flight flag clears once the detached scan settles.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const third = await app(new Request("http://localhost/api/run", { method: "POST" }));
+    expect(third.status).toBe(202);
     db.close();
   });
 
-  test("POST /api/run reports a failed scan without leaking internals", async () => {
+  test("POST /api/run releases the single-flight flag when the scan crashes", async () => {
     const { db } = await seed();
-    const response = await appFor(db, async () => {
+    const app = appFor(db, async () => {
       throw new Error("claude CLI exited 1: C:\\Users\\Ivonne\\secret\\path");
-    })(new Request("http://localhost/api/run", { method: "POST" }));
+    });
 
-    expect(response.status).toBe(500);
-    const body = (await response.json()) as { error: string };
-    expect(body.error).toBe("scan failed — check server logs");
-    expect(body.error).not.toContain("claude CLI");
+    const first = await app(new Request("http://localhost/api/run", { method: "POST" }));
+    // The crash happens after the response; the client only ever sees the 202. The run row
+    // itself is marked failed by runScan, which /api/runs/latest surfaces.
+    expect(first.status).toBe(202);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const second = await app(new Request("http://localhost/api/run", { method: "POST" }));
+    expect(second.status).toBe(202);
     db.close();
   });
 
@@ -434,6 +436,8 @@ describe("origin guard", () => {
     );
     expect(sameOrigin.status).toBe(202);
 
+    // Let the detached scan settle so the single-flight flag clears between the two posts.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const noOrigin = await app(new Request("http://localhost/api/run", { method: "POST" }));
     expect(noOrigin.status).toBe(202);
     db.close();

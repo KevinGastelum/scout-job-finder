@@ -78,6 +78,48 @@ describe("runScan", () => {
     db.close();
   });
 
+  // Run 17 crashed between startRun and finishRun and sat at 'running' for hours,
+  // indistinguishable from a live scan. A crash must record itself.
+  test("marks its own run failed when it crashes mid-flight", async () => {
+    const db = await openDb(":memory:");
+    // Retrieval is the first uncaught stage: dropping the FTS table makes it throw after
+    // the adapters completed, exactly the window run 17 died in.
+    db.run("DROP TABLE jobs_fts");
+
+    await expect(
+      runScan({
+        db,
+        adapters: [stubAdapter("remotive", ONE_ITEM)],
+        http: NOOP_HTTP,
+        llm: new MockLlmClient([]),
+        profile: {
+          version: "abc123abc123",
+          name: "Kevin",
+          headline: "agentic engineer",
+          citizenship: "US citizen",
+          baseLocation: "Phoenix, AZ",
+          remoteOnly: false,
+          openToRelocation: true,
+          acceptedLocations: ["remote", "united states"],
+          targetTitleFamilies: ["ai-engineer"],
+          seniorityMin: "mid",
+          seniorityMax: "staff",
+          skills: ["python"],
+          rareSkills: [],
+          targetCompanies: [],
+          summary: "summary",
+        },
+        now: () => new Date("2026-07-28T10:00:00.000Z"),
+      }),
+    ).rejects.toThrow();
+
+    const run = getLatestRun(db);
+    expect(run?.status).toBe("failed");
+    expect(run?.finishedAt).toBe("2026-07-28T10:00:00.000Z");
+    expect(run?.error).toBeTruthy();
+    db.close();
+  });
+
   test("re-running the same payload updates instead of duplicating", async () => {
     const db = await openDb(":memory:");
     const options = {

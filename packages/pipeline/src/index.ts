@@ -39,12 +39,28 @@ export interface ScanSummary {
 }
 
 export async function runScan(options: ScanOptions): Promise<ScanSummary> {
+  const now = options.now ?? (() => new Date());
+  failStaleRuns(options.db, now());
+  const runId = startRun(options.db, now().toISOString());
+  try {
+    return await collectAndScore(options, runId, now);
+  } catch (error) {
+    // A crash between startRun and finishRun used to leave the row at 'running' until the
+    // stale sweep six hours later; recording the failure keeps the dashboard's run line
+    // truthful. Run 17 died silently exactly this way.
+    finishRun(options.db, runId, "failed", [], now().toISOString(), describeError(error));
+    throw error;
+  }
+}
+
+async function collectAndScore(
+  options: ScanOptions,
+  runId: number,
+  now: () => Date,
+): Promise<ScanSummary> {
   const { db, adapters, http, llm } = options;
   const adapterLlm = options.adapterLlm ?? llm;
-  const now = options.now ?? (() => new Date());
   const startedAt = now().toISOString();
-  failStaleRuns(db, now());
-  const runId = startRun(db, startedAt);
   const stats: SourceStats[] = [];
 
   for (const adapter of adapters) {
