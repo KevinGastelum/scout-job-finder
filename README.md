@@ -154,6 +154,29 @@ see `docs/superpowers/specs/2026-07-28-agentic-job-finder-design.md`.
 `docs/operators-manual.md` is the runbook: cadence, what each command costs, and how to add
 a company board that isn't in the seed list.
 
+## How this project is run
+
+Scout is built by a human operator directing AI coding agents — and the repo is structured
+so that claim is verifiable rather than decorative:
+
+| Doc | What it holds |
+| --- | --- |
+| [`SPEC.md`](SPEC.md) | The one-page architecture contract and its non-negotiable invariants |
+| [`ROADMAP.md`](ROADMAP.md) | Phases, exit criteria, and the standing scope boundary |
+| [`STATUS.md`](STATUS.md) / [`TODO.md`](TODO.md) / [`TASKS.md`](TASKS.md) | Live state, prioritized next work, and the durable ledger of what shipped — updated every session |
+| [`HANDOFF.md`](HANDOFF.md) | How to work here without re-hitting known sharp edges |
+| [`AGENTS.md`](AGENTS.md) | The operating agreements every AI session works under: definition of done, audit gate, scope discipline, hard boundaries |
+| [`docs/codex-backlog.md`](docs/codex-backlog.md) | Every audit finding with a written disposition — fixed, deferred with reason, or rejected with evidence |
+| [`docs/operators-manual.md`](docs/operators-manual.md) | The runbook: cadence, what each command costs, troubleshooting |
+
+The accountability loop: every milestone is reviewed by an **independent AI auditor**
+(a different model with no authorship bias) before it may be pushed. Must-fix findings
+block; everything else is recorded with a disposition, including findings we rejected and
+why. The commit history shows the loop running — audit rounds, same-day fixes, and one
+documented disagreement resolved in writing. Alongside it: 600+ tests, strict TypeScript,
+append-only migrations, and `bun run doctor` as a non-zero-exit health gate wired into the
+scheduled daily run.
+
 ## Data handling
 
 Postings fetched from third parties are untrusted data, never instructions: every prompt that

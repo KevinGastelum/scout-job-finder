@@ -2,6 +2,12 @@
 
 Local-first agentic job-finder. Bun workspaces monorepo.
 
+## Session protocol
+
+Rehydrate before building: `STATUS.md` → `TODO.md` → `TASKS.md` → `HANDOFF.md`, then
+`bun run doctor`, then report and wait for a go. Full agent agreements: `AGENTS.md`.
+At session end, update STATUS/TODO/TASKS in a commit.
+
 ## Rules
 - Use `bun`, never `npm`. Tests are `bun test`, never `npm test`.
 - TypeScript strict. No `any` — use `unknown` and narrow.

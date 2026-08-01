@@ -1,8 +1,9 @@
 # Handoff
 
-For the next session (agent or human) picking up Scout cold. Read STATUS.md for where
-things stand and TODO.md for what's next; this file is how to work here without relearning
-the sharp edges.
+For the next session (agent or human) picking up Scout cold. Rehydration order and the
+working agreements live in `AGENTS.md`; STATUS.md is where things stand, TODO.md what's
+next, TASKS.md the ledger, SPEC.md/ROADMAP.md the architecture and phases. This file is
+how to work here without relearning the sharp edges.
 
 ## Mission, in one line
 
