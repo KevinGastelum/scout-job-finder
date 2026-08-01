@@ -7,7 +7,14 @@ import {
   openDb,
   setApplicationStatus,
 } from "@scout/core";
-import { RUBRIC_VERSION, rubricLlmFromEnv, tailorForJob } from "@scout/pipeline";
+import {
+  DRAFT_FILES,
+  RUBRIC_VERSION,
+  draftDirFor,
+  rubricLlmFromEnv,
+  tailorForJob,
+  writeTailorDrafts,
+} from "@scout/pipeline";
 
 const jobId = Number(process.argv[2]);
 const force = process.argv.includes("--force");
@@ -29,9 +36,8 @@ if (job === null) {
   process.exit(1);
 }
 
-const slug = job.companyNormalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const dir = `profile/applications/${jobId}-${slug}`;
-for (const name of ["resume-slant.md", "cover-letter.md"]) {
+const dir = draftDirFor(job);
+for (const name of DRAFT_FILES) {
   if (!force && (await Bun.file(`${dir}/${name}`).exists())) {
     console.error(`${dir}/${name} already exists — re-run with --force to overwrite the draft`);
     process.exit(1);
@@ -50,22 +56,7 @@ const score = storedScore?.profileVersion === profile.version ? storedScore : nu
 console.log(`tailoring for ${job.title} at ${job.company} (${job.url})`);
 
 const result = await tailorForJob(rubricLlmFromEnv(), job, profile, score, positioning);
-
-// Board-supplied text goes into an HTML comment, and any "--" can end one ("--!>" is a
-// closer too). Prose gets an em dash; the url percent-encodes, which decodes to the same
-// address.
-const safe = (value: string) => value.replaceAll("--", "—");
-const header = `<!-- ${safe(job.title)} @ ${safe(job.company)} · job ${jobId} · ${job.url.replaceAll("--", "%2D%2D")} -->\n\n`;
-await Bun.write(`${dir}/resume-slant.md`, header + result.resumeSlant.trim() + "\n");
-await Bun.write(
-  `${dir}/cover-letter.md`,
-  header +
-    result.coverLetter.trim() +
-    "\n\n## Talking points\n" +
-    result.talkingPoints.map((point) => `- ${point}`).join("\n") +
-    "\n\n## Gaps to be ready for\n" +
-    (result.gaps.length === 0 ? "- none identified\n" : result.gaps.map((gap) => `- ${gap}`).join("\n") + "\n"),
-);
+await writeTailorDrafts(job, result);
 
 // Drafting is what "tailored" means, and running this command IS the review — so an
 // untracked job advances too, not only a shortlisted one. Statuses further along
